@@ -1,0 +1,24 @@
+{
+    "globalAndTestGuildId": "00000000000000000",
+    "clientId": "12345678910111213",
+    "token": "put your token here, then rename this file to config.json",
+
+    "database": "databse",
+    "username": "user",
+    "password": "password",
+    "options": {
+        "host": "localhost",
+        "dialect": "sqlite",
+        "logging": false,
+        "storage": "database.sqlite"
+    },
+
+    "permissionHierarchy": {
+        "admins": ["0112358132134"],
+        "broadcasts": {
+            "Updates": [],
+            "art": ["01124713244481", "1248163264128256512"],
+            "music": ["1248163264128256512", "2374318073263443"]
+        }
+    }
+}

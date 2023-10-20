@@ -1,0 +1,25 @@
+{
+  "name": "ethansotherbot",
+  "version": "2.3.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "contributors": [
+    "Ethan <ethan@ethanssandbox.com>"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@discordjs/rest": "^2.0.0",
+    "@discordjs/voice": "^0.16.0",
+    "discord-api-types": "^0.37.60",
+    "discord-tts": "^1.2.2",
+    "discord.js": "^14.12.1",
+    "libsodium-wrappers": "^0.7.13",
+    "sequelize": "^6.33.0",
+    "sqlite3": "^5.1.6"
+  }
+}

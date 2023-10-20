@@ -1,0 +1,5 @@
+Are you scared because you enabled the bot to read all messages?
+I'll only log what you say in hyperchats for moderation purposes, but until the bot gains more widespread use you're probably a personal friend and aren't even worrying about it.
+These logs get destroyed when I close out Visual Studio or restart my computer. I do save some things like your settings, and VC introduction to your Discord userId, and if you run a server I just record some server settings (like whether or not the server name shows in hyperchats).
+It's not my fault if someone doxxes you through the hyperchannel, you need to keep your privacy into your own hands. Go install an offline password manager or something, stay safe. Also, please don't doxx each other (as said in the TOS).
+/texttovc uses Google's API so they probably keep track what's going through there (this is not slander to Google, just a guess!)

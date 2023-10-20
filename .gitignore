@@ -1,0 +1,7 @@
+.*
+!.gitignore
+config.json
+node_modules/
+database.sqlite
+assets/audio/intros/*
+assets/audio/texttovc/*
