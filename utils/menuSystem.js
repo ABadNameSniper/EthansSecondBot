@@ -32,10 +32,8 @@ module.exports = {
             );
 
             this.embed = embed;
-            //this.selectionType = selectionType;
             this.selections = selections;
             let rows = [navigationRow]//i can probably rewrite the this.rows crap.
-            //console.log(this.rows[0])
             switch(firstOrLast) {
                 case 3:
                     rows = [];
@@ -64,8 +62,7 @@ module.exports = {
                     newRow = new ActionRowBuilder();
                 }
             }
-            this.rows = rows;//NOTE: make custom error so i can make sure no more than 5 rows per page
-            //console.log(rows)
+            this.rows = rows;//TODO: make custom error so i can make sure no more than 5 rows per page
         }
     },
     Menu: class {

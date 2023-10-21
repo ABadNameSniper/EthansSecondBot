@@ -105,7 +105,6 @@ module.exports = {
         ),
 	async execute(interaction) {
         const userId = interaction.user.id
-        console.log(`Some chad ${userId} started a game of minesweeper`);
         
         const endGame = function(additionalMessage, scaryOutside) {
             playerData[userId]?.buttonCollector.stop();
@@ -323,14 +322,15 @@ module.exports = {
         
         let initialClickTime;
         let firstGuess;
-        const inputFunction = function(playerInfo) {//consider moving up there
+        const inputFunction = function(playerInfo) {
+            //consider moving up there
             //make sure to just not update the board if no valid move is put. Don't want to waste like a kilobyte of bandwidth!!
             if (playerInfo.x !== null 
                 &&  playerInfo.y !== null 
                 && playerInfo.x < width 
                 && playerInfo.y<height
-            ) {//add better "security"
-                //console.log("beginning calculations")
+            ) {
+                //add better "security"
                 //this is the first guess.
                 searchAndSetStyle(playerInfo.lastYButton, ButtonStyle.Primary, rows);
                 searchAndSetStyle(playerInfo.lastXButton, ButtonStyle.Secondary, rows);
@@ -369,7 +369,6 @@ module.exports = {
                                 )
                             ) {
                                 placedBombs++;
-                                //console.log('bomb placed!', placedBombs);
                                 field[x][y] = true;
                                 field = safeIncrement(field, x+1, y);//i don't like it
                                 field = safeIncrement(field, x+1, y+1)
@@ -411,7 +410,6 @@ module.exports = {
                 gameDisplayString = topString;
                 for (let i = 0; i < visibleField.length; i++) {
                     gameDisplayString+=letterChars.substring(i*2,i*2+2);
-                    //console.log(letterChars[i]);
                     for (let j = 0; j < visibleField[i].length; j++) {
                         if (visibleField[i][j] === "flag") {
                             gameDisplayString+='\uD83D\uDEA9';
@@ -440,7 +438,6 @@ module.exports = {
                 const msTime = Date.now()-initialClickTime;
                 endGame(`\nDifficulty: ${difficulty} | ${minesAmount} mines complete in ${msTime/1000} seconds!`);
                 if (difficulty==="Custom") return;
-                console.log(difficulty);
                 minesweeperGame.create({
                     userInfoUserId: userId,
                     serverInfoServerId: interaction?.guild?.id || globalAndTestGuildId,
@@ -480,7 +477,6 @@ module.exports = {
         //wait a second i really only need this for the buttons... otherwise... yeah...
         const buttonSelect = function(playerInfo, buttonId) {
             if (buttonId === 'flag') {
-                console.log('button selected is flag');
                 searchAndSetStyle(
                     'flag',
                     ButtonStyle.Success,

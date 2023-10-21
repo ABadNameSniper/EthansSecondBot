@@ -55,10 +55,8 @@ module.exports = {
         let playingStatus = false;
 
         await vcObj[voiceChannelId].connection.on(VoiceConnectionStatus.Ready, async () => {
-            console.log("Connection established.")
             return true;
         })
-        console.log("ready");
         
         player.on(AudioPlayerStatus.Idle, ()=>{//automatically finish queueue
             
@@ -96,8 +94,6 @@ module.exports = {
                     })
                     .values()
                 );
-
-                console.log(msgQueue)
                 //No worries. If you're already playing something, the rest will automatically be played
                 if (playingStatus) return; 
                 player.play(msgQueue.shift());

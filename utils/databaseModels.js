@@ -52,7 +52,6 @@ module.exports = {
         if (inclusions) {
             currentUserInfo = await userInfo.findByPk(userId, {include: inclusions});// why fetch it again? A; format issue
         }
-        //console.log(currentUserInfo);
         return currentUserInfo;
     },
     serverInfo: function(sequelize, Sequelize) {

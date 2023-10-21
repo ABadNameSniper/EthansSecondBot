@@ -105,7 +105,6 @@ module.exports = {
 		.setName('info')
 		.setDescription('Bot help, information, credits, etc.'),
 	async execute(interaction) {
-        //console.log(menu);
         const message = await menu.send(interaction);//switcch to .then
         const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, idle: 120_000 });
         collector.on('collect', i => {

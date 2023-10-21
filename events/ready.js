@@ -8,7 +8,6 @@ const guildCommands = [];
 
 for (const file of fs.readdirSync(commandsFolderPath)) {
 	const command = require(`${commandsFolderPath}/${file}`); 
-    //console.log(file)
     if (command.guildCommand) {
         guildCommands.push(command.data.toJSON());
     } else {

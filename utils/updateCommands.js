@@ -53,7 +53,6 @@ const getCurrentGuildCommands = function(guildCommandNames, guildId, replace) {
             currentGuildCommands.push(command.data.toJSON());
         }
     }
-    //console.log(currentGuildCommands.map(json => {return json.name}));//not efficient but didn't ask, don't care + ratio
     return(currentGuildCommands);
 }
 
@@ -68,9 +67,7 @@ module.exports = {
     },
     updateGuildCommands: async function(client, guildIds, guildCommandNames, replace = true) {//replace could be unnecessary
         guildIds = await formatGuildIds(guildIds, client);
-        //console.log(guildIds);
         for (const guildId of guildIds) {
-            //console.log(`Putting guildcommands for server ${guildId}`);
             const currentGuildCommands = getCurrentGuildCommands(guildCommandNames, guildId/*, replace*/);
             client.guilds.fetch(guildId).then(guild => {
                 console.log(guildId, guild.name);
@@ -88,7 +85,6 @@ module.exports = {
             commandNames = [commandNames];
         }
         guildIds = await formatGuildIds(guildIds, client);
-        //console.log(guildIds);
         for (const guildId of guildIds) {
             const guild = await client.guilds.fetch(guildId);
             guild.commands.fetch().then(map => {

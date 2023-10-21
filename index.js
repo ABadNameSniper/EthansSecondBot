@@ -28,7 +28,6 @@ for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
     //set a new item in the collection
     // with the key as the command name and the value as the exported module
-	//if (!command.data) {console.log(`malformed command: ${file}`); return}  old code
     if (!command.data) console.error(`malformed command: ${file}`);
     client.commands.set(command.data.name, command); //as seen in interactionCreate.js
 }

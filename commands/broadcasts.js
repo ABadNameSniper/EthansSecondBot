@@ -27,15 +27,8 @@ const addNewChannel = async function(listeningChannel, channelId, category) {
     listeningChannel.create({
         channelId: channelId,
         category: category
-    })//.then(console.log);
+    })
 }
-
-// const addChoices = function(option) {
-//     for (const category of broadcastCategories) {
-//         option.addChoice(category, category);
-//     }
-//     return option;
-// }
 
 const makeCategoriesOption = function(option) {
     option.setName('category')
@@ -106,7 +99,6 @@ module.exports = {
         const category = interaction.options.getString('category');
         
         if (channel && channel.type!==ChannelType.GuildText) {
-            //console.log(channel);
             interaction.reply("You have to select a text channel!");
             return;
         }
@@ -138,12 +130,11 @@ module.exports = {
                 } 
                 interaction.reply("Sending message");
                 let message = interaction.options.getString('message');
-                console.log(message);
+                console.log("Broadcasting message:", message);
                 const attachment = interaction.options.getAttachment('media');
                 message = message + "\n" + (attachment?.url || '')
                 listeningChannel.findAll({where:{category: category}}).then(results => {
                     for (const listeningChannelItem of results) {
-                        //console.log(listeningChannelItem);
                         try {
                             client.channels.fetch(listeningChannelItem.channelId)
                             .then((channel) => {
@@ -171,7 +162,6 @@ module.exports = {
                 listeningChannel.destroy({
                     where: whereObj
                 }).then( (promise) => {
-                    //console.log(promise);
                     interaction.reply("Successfully removed " + categoriesDeleted + " from that channel.")
                 })
                 break;

@@ -14,7 +14,7 @@ module.exports = {
 	name: 'guildCreate',
 	async execute(guildId, client) {
         const guild = await client.guilds.fetch(guildId);
-        console.log(guild);
+        console.log("Hey, the bot was added to a new server!", guild);
         await updateCommands.updateGuildCommands(client, guild.id);
         updateCommands.updateGuildCommandPermissions(client, guild.id);
         const welcomeString = 

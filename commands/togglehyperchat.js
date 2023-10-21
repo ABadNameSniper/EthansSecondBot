@@ -79,8 +79,6 @@ const getUniqueEmbeddables = function(newEmbeddablesCollection, oldEmbeddablesCo
 				break;
 			}
 		}
-		//uniquely new embed
-		//console.log("Look at this embed in the updated message! ", newEmbed);
 	}
 	return [uniqueEmbeddables, commonEmbeddables];
 }
