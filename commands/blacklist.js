@@ -16,8 +16,7 @@ serverInfo.hasMany(blacklistItem, {sourceKey: 'serverId'});
 
 //before or after defining associations??
 userInfo.sync();
-blacklistItem.sync({force: false})//.then(console.log("bli sync"));
-
+blacklistItem.sync({force: false})
 
 
 module.exports = {
@@ -46,11 +45,16 @@ module.exports = {
             .setDescription("Will this blacklist apply outside of this server? Admins only.")
         ),
     async execute(interaction) {
+        if (!(
+            admins.includes(interaction.user.id)
+            || interaction.guild.ownerId === interaction.user.id
+        )) return;
+
+
         const userId = interaction.options.getUser('user').id;
         const severity = Math.max(Math.min(interaction.options.getInteger('severity'), 4), 1)   || 1;
         const remove = interaction.options.getBoolean('remove')                                 || false;
         const global = interaction.options.getBoolean('global')                                 || false;
-        let currentUserInfo = await databaseModels.userInfoDefault(userInfo, userId);
         if (!remove) {
             await blacklistItem.create({
                 userInfoUserId: userId,
