@@ -107,8 +107,8 @@ module.exports = {
         const userId = interaction.user.id
         
         const endGame = function(additionalMessage, scaryOutside) {
-            playerData[userId]?.buttonCollector.stop();
-            playerData[userId]?.messageCollector.stop();
+            playerData[userId]?.buttonCollector?.stop();//had an err where buttonCollector didn't exist. Weird.
+            playerData[userId]?.messageCollector?.stop();
             if (scaryOutside) return;
             gameDisplayString = topString;
             for (let i = 0; i < visibleField.length; i++) {

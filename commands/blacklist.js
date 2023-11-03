@@ -62,18 +62,18 @@ module.exports = {
                     ? globalAndTestGuildId
                     : interaction.guild.id,
                 severity: severity
-            }).then(console.log);
+            })
 
             interaction.reply(`<@${userId}> blacklisted from ${global ? "everywhere" : "this server"} at severity level ${severity}.`);
         } else {
             if (global && admins.includes(interaction.user.id)) {
                 blacklistItem.destroy({where: {serverInfoServerId: globalAndTestGuildId}}).then(
                     interaction.reply(`<@${userId}> removed from the global blacklist`)
-                ).catch(console.log);
+                )
             } else {
                 blacklistItem.destroy({where: {serverInfoServerId: interaction.guild.id}}).then(
                     interaction.reply(`<@${userId}> removed from the server blacklist`)
-                ).catch(console.log);
+                )
             }
         }
         

@@ -84,7 +84,6 @@ const getUniqueEmbeddables = function(newEmbeddablesCollection, oldEmbeddablesCo
 }
 
 const updateEmbeds = async function(oldmsg, newmsg, client) {
-	console.log(newmsg);
 	//Gate out bots and the channel the message was sent in
 	if (oldmsg?.author?.bot || !Object.keys(textchannelinfo).includes(oldmsg.channelId)) return;
 
@@ -230,11 +229,9 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('togglehyperchat')
 		.setDescription('Join or leave a call')
-        
 		.addIntegerOption(option =>
             option.setName("hyperchannelid")
                 .setDescription("Leave blank for a random channel. Set to 0 to leave. Make negative to join in 'private mode'.")
-				//.setMinValue(0)
 		)
 		.addIntegerOption(option =>
             option.setName("timeout")
@@ -258,23 +255,22 @@ module.exports = {
 		const client = interaction.client;
 		const channelId = interaction.channelId;
 		let hyperchannelId = interaction.options.getInteger('hyperchannelid');
-		if (!textchannelinfo[channelId]) textchannelinfo[channelId] = {};
 		if (!isDM) currentServerInfo = await databaseModels.serverInfoDefault(serverInfo, interaction.guild.id);
 		if (!isDM && (!currentServerInfo || !currentServerInfo.get("serverSettings").allowhyperchats)) {
 			interaction.reply("Hyperchats not enabled in this server! Toggle them on with /serversettings");
 			return;
 		} 
 
-		//If channel is in a hyperchannel already, toggle off (if you're not changing)
-		if (textchannelinfo[channelId].hyperchannelId) {
+		let prefaceText = "";
+		//If channel is in a hyperchannel already
+		if (textchannelinfo[channelId]) {
 			if (!hyperchannelId) {
-				if (textchannelinfo[channelId].collector) {
-					interaction.reply(
-						`Leaving hyperchat channel ${textchannelinfo[channelId].hyperchannelId} due to manual disconnection`
-						);
-					textchannelinfo[channelId].collector.stop("manual disconnection.");
-					return;
-				}
+				interaction.reply(`Leaving hyperchat channel ${hyperchannelId} due to manual disconnection by <@${interaction.user.id}>.`);
+				textchannelinfo[channelId].collector.stop("manual");
+				return;
+			} else {//hyperchannelId explicitly defined as nonzero value
+				prefaceText = `Leaving hyperchat channel ${textchannelinfo[channelId].hyperchannelId}. ` 
+				textchannelinfo[channelId].collector.stop("switching");
 			}
 		} else {
 			//explicitly try to disconnect when not in a channel
@@ -309,10 +305,18 @@ module.exports = {
 		hyperchannelId = Math.abs(hyperchannelId);
 		
 
+		
+
+		//Set a timeout time, default of 7 minutes. Max of 14 minutes due to dropping listeners past 15.
+		const timeout = Math.min(interaction.options.getInteger('timeout'), 14) || 7;
+		//i check if hci has a hcID like 3 times. condense later?
+		if (!hyperchannelinfo[hyperchannelId]) hyperchannelinfo[hyperchannelId] = {};
+		textchannelinfo[channelId] = {};
+		
+		textchannelinfo[channelId].hyperchannelId = hyperchannelId;
+		hyperchannelinfo[hyperchannelId][channelId] = true;
+
 		//Here's an abomination of mixing around strings
-		let prefaceText = textchannelinfo[channelId].hyperchannelId 
-			? `Leaving hyperchat channel ${textchannelinfo[channelId].hyperchannelId}. ` 
-			: ""//if there's already something there, let the user know
 		textchannelinfo[channelId].privateConnection = 
 			interaction.options.getInteger('hyperchannelid') < 0 
 			&& blSeverity < 1 
@@ -325,15 +329,6 @@ module.exports = {
 			prefaceText+="J"
 			client.user.setActivity(`HC-${hyperchannelId}`, {type: ActivityType.Listening});
 		}
-
-		//Set a timeout time, default of 7 minutes. Max of 14 minutes due to dropping listeners past 15.
-		const timeout = Math.min(interaction.options.getInteger('timeout'), 14) || 7;
-		//i check if hci has a hcID like 3 times. condense later?
-		if (!hyperchannelinfo[hyperchannelId]) hyperchannelinfo[hyperchannelId] = {};
-		if (textchannelinfo[channelId].collector) textchannelinfo[channelId].collector.stop("switching");
-		
-		textchannelinfo[channelId].hyperchannelId = hyperchannelId;
-		hyperchannelinfo[hyperchannelId][channelId] = true;
 
 		const otherChannelsAmount = Object.keys(hyperchannelinfo[hyperchannelId]).length;
 
@@ -486,25 +481,19 @@ module.exports = {
 					textchannelinfo[channelId].lastSentMessageId = msg.id;
 					textchannelinfo[channelId].promiseResolve();
 				});
-				if (urls!=='') currentChannel.send(urls);
+				if (urls) currentChannel.send(urls);
 			}));
 		});
 
 		textchannelinfo[channelId].collector.on('end', (_collected, reason) => {
-			textchannelinfo[channelId] = null;
-			hyperchannelinfo[hyperchannelId][channelId] = null;
+			delete textchannelinfo[channelId]
+			delete hyperchannelinfo[hyperchannelId][channelId]
 
 			//eval if any channels remain
-			const cleanup = !hyperchannelinfo[hyperchannelId].some(remaining => remaining);
-			if (cleanup) hyperchannelinfo[hyperchannelId] = null;
-			//cleanup would be slightly more extensive if I had message update/delete events per channel 
+			if (Object.keys(hyperchannelinfo[hyperchannelId]).length) delete hyperchannelinfo[hyperchannelId];
 
-
-			//more clarity
-			if (reason) reason = "no one talking; timout.";
-
-			//interaction.followUp(`Leaving hyperchat channel ${hyperchannelId} due to ${reason}`);
-			interaction.channel.send(`Leaving hyperchat channel ${hyperchannelId} due to ${reason}`);
+			//Manual and switching reasons are handled earlier.
+			if (reason === "timeout") interaction.channel.send(`Leaving hyperchat channel ${hyperchannelId} due to no one talking; timeout.`);
 
 			client.user.setActivity('the phone', {type: ActivityType.Listening})
 			

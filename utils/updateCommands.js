@@ -70,7 +70,7 @@ module.exports = {
         for (const guildId of guildIds) {
             const currentGuildCommands = getCurrentGuildCommands(guildCommandNames, guildId/*, replace*/);
             client.guilds.fetch(guildId).then(guild => {
-                console.log(guildId, guild.name);
+                console.log("Updating:", guildId, guild.name);
             })
             await rest.put(
                 Routes.applicationGuildCommands(clientId, guildId),

@@ -15,7 +15,7 @@ const endTTS = function(collected, voiceChannelId) {
     vcObj[voiceChannelId].player.stop();
     vcObj[voiceChannelId].connection.destroy();
     vcObj[voiceChannelId].msgCollector.stop();
-    vcObj[voiceChannelId] = null;
+    delete vcObj[voiceChannelId];
 }
 
 module.exports = {
