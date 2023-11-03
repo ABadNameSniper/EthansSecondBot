@@ -99,29 +99,38 @@ module.exports = {
         if (orderArray.length > 0) {
             options.order = orderArray;
         }
+        //TODO: sort by time.
         const entries = selectedmodel.findAll(options).then(async (foundModels) => {
-            if (foundModels.length===0) {
-                interaction.reply(`Nothing found, wow!` + ((interaction.user.id === userId||"")&&" Go set a record!")); 
+            if (!foundModels.length) {
+                interaction.reply(`Nothing found, wow!` + ((interaction.user.id === userId || "") && " Go set a record!")); 
                 return;
             };
             let displayString = "";
-            for (const foundModel of foundModels) {
+            const promises = foundModels.map(async (foundModel) => {
                 const { displayName } = await resolveName(await client.users.fetch(foundModel.userInfoUserId), null, false, "ymous");
-                displayString +=
-                `User: ${
-                    displayName
-                } | Server: ${
-                    foundModel.serverInfoServerId === globalAndTestGuildId 
-                        ? "Global" 
+                let serverName;
+                try {
+                    serverName = foundModel.serverInfoServerId === globalAndTestGuildId || !foundModel.serverInfoServerId
+                        ? "[Global]" 
                         : (await client.guilds.fetch(foundModel.serverInfoServerId)).name
-                } | Difficulty: ${
-                    foundModel.difficulty
-                } | Time: ${
-                    foundModel.time/1000
-                }\n`
-            }
-            //TODO prevent breaking if displayString.length>2000
-            interaction.reply(displayString);
+                } catch (error) {
+                    serverName = "[Unknown Server]"
+                    console.log("Note: could not get the guild. Error:", error);
+                }
+                displayString +=
+                    `User: ${
+                        displayName
+                    } | Server: ${
+                        serverName
+                    } | Difficulty: ${
+                        foundModel.difficulty
+                    } | Time: ${
+                        foundModel.time / 1000
+                    }\n`
+            });
+            await Promise.all(promises);
+            //TODO slice this up into chunks in a util file. Or paginate it.
+            interaction.reply(displayString.substring(0, 1999));
         });
         
     }
