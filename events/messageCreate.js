@@ -12,11 +12,8 @@ const { PermissionFlagsBits } = require('discord.js')
 const blacklistItem = databaseModels.blacklistItem(sequelize, Sequelize.DataTypes);
 userInfo.hasMany(blacklistItem, {sourceKey: 'userId'});
 blacklistItem.belongsTo(userInfo, {targetKey: 'userId'});
-
 serverInfo.hasMany(blacklistItem, {sourceKey: 'serverId'});
-blacklistItem.belongsTo(serverInfo, {
-    targetKey: 'serverId'
-})
+blacklistItem.belongsTo(serverInfo, {targetKey: 'serverId'});
 
 serverInfo.sync();
 
@@ -38,18 +35,17 @@ module.exports = {
 
         const severity = (await blacklistItem.findAll({
             where: {
-                [Op.or]: [
+                [Op.or]: [// Filtering out irrelevant servers
                     {serverInfoServerId: msg.guild.id}, 
                     {serverInfoServerId: globalAndTestGuildId}
                 ],
-                
             },
             order: [
                 ["severity", "DESC"]
             ],
         }))?.[0]?.severity;
 
-        if (severity >= 3) return; //Banned from using hyperchats, at least in the server
+        if (severity >= 3) return;
 
         for (const pair in triggerwords) {
             if (

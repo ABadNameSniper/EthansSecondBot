@@ -6,7 +6,7 @@ const Sequelize = require('sequelize');
 const sequelize = new Sequelize(database, user, password, options);
 const {Page, Menu, sliceIntoChunks } = require(indexRoot+'/utils/menuSystem.js');//selection type could be obsolete, consider removing (from source!)
 const { EmbedBuilder, ComponentType } = require('discord.js');
-const databaseModels = require('../utils/databaseModels');
+const databaseModels = require(indexRoot+'/utils/databaseModels');
 const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes);
 userInfo.sync();
 

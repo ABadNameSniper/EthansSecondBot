@@ -57,8 +57,8 @@ let menu = new Menu(//i'd love to redefine up there
                 "The /blacklist command is used to restrict a user's ability to use ESB. Note that ESB is not a moderation bot, so go add Dyno or something if you need that.\r"+
                 "While in development, these are subject to change, and I may even drop the blacklist database from time to time, but for now:\r"+
                 "1: Can't use @someone or privately join a hyperchat.\r"+
-                "2: The above and can't use minesweeper nor toggle a hyperchat nor use intros.\r"+//Consider changing intros to 3
-                "3: The above and can't speak in hyperchat nor toggle trigger words.\r"+
+                "2: The above *and* can't use minesweeper nor toggle a hyperchat nor use intros.\r"+//Consider changing intros to 3
+                "3: The above *and* can't speak in hyperchat nor toggle trigger words.\r"+
                 "4: Cannot interact with Ethan's Second Bot.\n"+
                 "**Other Information**\r"+ 
                 "Sometimes messages just don't embed when sent through a hyperchannel. Blame internet speeds or Discord or something.\r"+
