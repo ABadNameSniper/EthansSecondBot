@@ -33,18 +33,16 @@ should've done better caching for users on top of discord.js
 
 change privacy settings to more accurately reflect display name vs username
 
-fix not responding to first interactions in guilds after a restart
-
 fix weird double embedding bug with hyperchats?
 
 combine serverInfoDefault/userInfoDefault into something much, much better. Eliminate all rogue FindOnes
 + provide the user row to each command (with verification/permissions) in the command handler, as a second argument
 
 replying to hyperchats should reply to the original message
-
+ 
 remove permissionHierarchy.broadcasts, put that all into the database. Dynamic categories or something
 
 maybe lint the source code?
 
-make menu system more inclusive instead of having the same menu code pasted on 4 different commands
+make menu system more encompassing instead of having the same menu code pasted on 4 different commands
 

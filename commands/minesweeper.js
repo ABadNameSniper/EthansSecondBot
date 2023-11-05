@@ -217,7 +217,7 @@ module.exports = {
                 "so with this control layout I can only add 24 buttons + the flag! Try making a smaller grid");
             return;
         } 
-        if (minesAmount/(width*height)>0.4) {
+        if (minesAmount/(width*height) > 0.4) {
             interaction.reply(
                 `Sorry, the maximum mine concentration is 40%, you had ${
                     ((minesAmount/(width*height)*100).toString()).substring(0, 5)
@@ -259,7 +259,7 @@ module.exports = {
                 }
             }
         } 
-        let topString = topStringOG.slice(0, width+1).join('')+'💣\n';
+        let topString = topStringOG.slice(0, width + 1).join('')+'💣\n';
         let flagsAmount = 0;
         let squaresDug = 0;
         let winState;
@@ -301,9 +301,9 @@ module.exports = {
             for (let j = 0; j < visibleField[i].length; j++) {
                 gameDisplayString+='⬜';
             }
-            gameDisplayString+=letterChars.substring(i*2,i*2 + 2) + '\n';
+            gameDisplayString += letterChars.substring(i*2, i*2 + 2) + '\n';
         }
-        gameDisplayString+=
+        gameDisplayString +=
             topString
             + `\nDifficulty: ${difficulty} | Total Mines: ${minesAmount} | Mines Left: ${minesAmount-flagsAmount}`;
         const message = await interaction.reply({

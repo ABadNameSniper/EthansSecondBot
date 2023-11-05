@@ -23,10 +23,12 @@ const messageDelete = require('./../events/messageDelete').emitter;
 
 const embeddablesCollectionMetaTypes = ['embeds', 'attachments', 'stickers']
 
-var textchannelinfo = {
+var textChannels = {
 	/*
 	'1243798753': {
-		hyperchannelId: "1",
+		id: '1243798753',
+		hyperChannelId: '1', //necessary because the hyperchannels are arrays of textChannel objects and cannot store their own ID
+		hyperChannel: hyperChannel
 		collector: collector,
 		privateConnection: false,
 		lastRecievedMessageId: msg.id, actually could be worth keeping in conjunction...
@@ -35,24 +37,32 @@ var textchannelinfo = {
 	*/
 
 }
-var hyperchannelinfo = {
-	/* genius past me for making these objects for no reason
-		'123456' : {
-			//'lastRecievedMessageId': msg.id //a little yucky
-			'12343798753' : true,
-			'35789734321' : true,
-		},
-		'789101' : {
-			//'lastRecievedMessageId': msg.id
-			'1223894584': true
-		}
-		
-	*/
+var hyperChannels = {
+/*
+	'123456' : [textChannel, textChannel]
+	'789101' : [textChannel]
+*/
 }
 
 //This cache isn't so good. It just records the last message id. 
 //A better implementation would be an entire array or something.
 var hypermessageidcache;
+
+var hyperMessageCache = {
+	/*
+	"102039847832": { //Original message ID
+		originalChannel: "12897123489"
+		otherChannels: {
+			//Should be channelId/messageId pair so as to be able to easily drop channels from the message cache
+			//when they leave the hyperchat
+			"83298234793": 018723498234,
+			"78324982343": 832489123432,
+		}
+	}
+
+
+	*/
+}
 
 var anonymousCache = [];
 
@@ -85,20 +95,20 @@ const getUniqueEmbeddables = function(newEmbeddablesCollection, oldEmbeddablesCo
 
 const updateEmbeds = async function(oldmsg, newmsg, client) {
 	//Gate out bots and the channel the message was sent in
-	if (oldmsg?.author?.bot || !Object.keys(textchannelinfo).includes(oldmsg.channelId)) return;
+	if (oldmsg?.author?.bot || !Object.keys(textChannels).includes(oldmsg.channelId)) return;
 
 	let scansets; //amount of images to fetch
 	let scanreps; //upper limit to retry
 	if (hypermessageidcache === oldmsg.id) {
-		console.log('Updated message was the last hypermessage of all hyperchannels');
+		console.log('Updated message was the last hypermessage of all hyperChannels');
 		scansets = 2;
 		scanreps = 1;
-	} else if (textchannelinfo[oldmsg.channelId].lastRecievedMessageId === oldmsg.id){
+	} else if (textChannels[oldmsg.channelId].lastRecievedMessageId === oldmsg.id){
 		console.log('Updated message was the last hypermessage in this textchannel')
 		scansets = 4;
 		scanreps = 3;
 	} else {
-		//could be capped by finding the hyperchannel origin
+		//could be capped by finding the hyperChannel origin
 		console.log("Couldn't find updated message as a last message. Widening search.")
 		scansets = 10;
 		scanreps = 5;
@@ -121,17 +131,18 @@ const updateEmbeds = async function(oldmsg, newmsg, client) {
 	}
 
 	//Going through the release, I have no idea what .goAhead is for
-	if (textchannelinfo[oldmsg.channelId].goAhead) {
-		await textchannelinfo[oldmsg.channelId].goAhead;
+	//upon further examination I think it's to wait until the previous message's sending/editing
+	// has been confirmed to have been recieved before sending a new one.
+	// Seems unnecessary, will probably remove next update.
+	if (textChannels[oldmsg.channelId].goAhead) {
+		await textChannels[oldmsg.channelId].goAhead;
 	}
 
 	Promise.all(
-		Object.keys(hyperchannelinfo[textchannelinfo[oldmsg.channelId].hyperchannelId])
-		.map(async (iteratingChannelId) => 
-	{
-		if (iteratingChannelId === oldmsg.channelId) return;
+		textChannels[oldmsg.channelId].hyperChannel.map(async (currentTextChannel) => {
+		if (currentTextChannel.id === oldmsg.channelId) return;
 		let lastScannedMessage = null;
-		const currentChannelMessages = (await client.channels.fetch(iteratingChannelId)).messages;
+		const currentChannelMessages = (await client.channels.fetch(currentTextChannel.id)).messages;
 		for (let i = 0; i < scanreps; i ++) {
 			for (const [msgid, message] of await currentChannelMessages.fetch({limit: scansets, before: lastScannedMessage})) {
 				//reading through this, it looked like it should've been continue. Originally break
@@ -218,8 +229,7 @@ const updateEmbeds = async function(oldmsg, newmsg, client) {
 };
 
 messageDelete.on('messageDelete', updateEmbeds);
-//Note: happens quite often,
-//since Discord can take a bit to embed links into the message
+//Note: message updates occur frequently because links embed even just a couple seconds after a message is sent 
 messageUpdate.on('messageUpdate', updateEmbeds);
 
 
@@ -253,43 +263,46 @@ module.exports = {
 		if (blSeverity >= 2) return; //maybe replying would be a better experience than ignoring
 		
 		const client = interaction.client;
-		const channelId = interaction.channelId;
-		let hyperchannelId = interaction.options.getInteger('hyperchannelid');
-		if (!isDM) currentServerInfo = await databaseModels.serverInfoDefault(serverInfo, interaction.guild.id);
+		const textChannelId = interaction.channelId;
+		let textChannel = textChannels[textChannelId];
+		let hyperChannelId = interaction.options.getInteger('hyperChannelId');
+		if (!isDM) currentServerInfo = await databaseModels.serverInfoDefault(serverInfo, interaction.guildId);
 		if (!isDM && (!currentServerInfo || !currentServerInfo.get("serverSettings").allowhyperchats)) {
 			interaction.reply("Hyperchats not enabled in this server! Toggle them on with /serversettings");
 			return;
 		} 
 
 		let prefaceText = "";
-		//If channel is in a hyperchannel already
-		if (textchannelinfo[channelId]) {
-			if (!hyperchannelId) {
-				interaction.reply(`Leaving hyperchat channel ${hyperchannelId} due to manual disconnection by <@${interaction.user.id}>.`);
-				textchannelinfo[channelId].collector.stop("manual");
+		//If channel is in a hyperChannel already
+		if (textChannel) {
+			if (!hyperChannelId) {
+				interaction.reply(`Leaving hyperchat channel ${textChannel.hyperChannelId} due to manual disconnection by <@${interaction.user.id}>.`);
+				textChannel.collector.stop("manual");
 				return;
-			} else {//hyperchannelId explicitly defined as nonzero value
-				prefaceText = `Leaving hyperchat channel ${textchannelinfo[channelId].hyperchannelId}. ` 
-				textchannelinfo[channelId].collector.stop("switching");
+			} else {//hyperChannelId explicitly defined as nonzero value
+				prefaceText = `Leaving hyperchat channel ${textChannel.hyperChannelId}. ` 
+				textChannel.collector.stop("switching");
 			}
 		} else {
 			//explicitly try to disconnect when not in a channel
-			if (hyperchannelId === 0) { 
+			if (hyperChannelId === 0) { 
 				interaction.reply({content: "You weren't connected to a channel in the first place!", ephemeral: true});
 				return;
-			} else if (!hyperchannelId) {
+			} else if (!hyperChannelId) {
 				//choose randomly from channels non-privately joined
-				scrambledHyperchannels = Object.keys(hyperchannelinfo).sort(() => { return 0.5 - Math.random() });
-				for (let possibleHyperchannelId of scrambledHyperchannels) {
-					const value = hyperchannelinfo[possibleHyperchannelId];
-					for (let investigateChannel in value) {
-						if (!textchannelinfo[investigateChannel].privateConnection) {
-							hyperchannelId = possibleHyperchannelId;
+				for (
+					let possibleHyperChannelId of Object.keys(hyperChannels).sort(
+						() => { return 0.5 - Math.random() }
+					)
+				) {
+					for (const potentialChannel of hyperChannels[possibleHyperChannelId]) {
+						if (!potentialChannel.privateConnection) {
+							hyperChannelId = possibleHyperChannelId;
 							break;
 						}
 					}
 					//Found one? Great. No need to continue this loop.
-					if (hyperchannelId) {
+					if (hyperChannelId) {
 						break;
 					}
 				}
@@ -297,59 +310,59 @@ module.exports = {
 
 		}
 
-		//oh, there's no channels it could join? Choose a random one.
-		if (!hyperchannelId) {
-			hyperchannelId = Math.trunc(Math.random()*Number.MAX_SAFE_INTEGER);
-		}
-
-		hyperchannelId = Math.abs(hyperchannelId);
+		hyperChannelId = hyperChannelId 
+			? Math.abs(hyperChannelId)
+			//oh, there's no channels it could join? Choose a random one.
+			: Math.trunc(Math.random() * Number.MAX_SAFE_INTEGER);
 		
-
+		hyperChannelId = hyperChannelId.toString();
 		
-
 		//Set a timeout time, default of 7 minutes. Max of 14 minutes due to dropping listeners past 15.
 		const timeout = Math.min(interaction.options.getInteger('timeout'), 14) || 7;
 		//i check if hci has a hcID like 3 times. condense later?
-		if (!hyperchannelinfo[hyperchannelId]) hyperchannelinfo[hyperchannelId] = {};
-		textchannelinfo[channelId] = {};
+		if (!hyperChannels[hyperChannelId]) hyperChannels[hyperChannelId] = [];
+		const hyperChannel = hyperChannels[hyperChannelId];
 		
-		textchannelinfo[channelId].hyperchannelId = hyperchannelId;
-		hyperchannelinfo[hyperchannelId][channelId] = true;
+		textChannels[textChannelId] = {
+			id: textChannelId,
+			hyperChannelId,
+			hyperChannel,
+			privateConnection: 
+				interaction.options.getInteger('hyperChannelId') < 0 && blSeverity < 1 
+					? true 
+					: false,//if random or otherwise...
+			collector: interaction.channel.createMessageCollector({filter, idle: 60_000*timeout})
+		};
+		textChannel = textChannels[textChannelId];
+		
+		const otherChannelsAmount = hyperChannel.push(textChannel);
 
-		//Here's an abomination of mixing around strings
-		textchannelinfo[channelId].privateConnection = 
-			interaction.options.getInteger('hyperchannelid') < 0 
-			&& blSeverity < 1 
-				? true 
-				: false;//if random or otherwise...
-
-		if (textchannelinfo[channelId].privateConnection) {
-			prefaceText+="Privately j"
+		if (textChannel.privateConnection) {
+			prefaceText += "Privately j"
 		} else {
-			prefaceText+="J"
-			client.user.setActivity(`HC-${hyperchannelId}`, {type: ActivityType.Listening});
+			prefaceText += "J"
+			client.user.setActivity(`HC-${hyperChannelId}`, {type: ActivityType.Listening});
 		}
 
-		const otherChannelsAmount = Object.keys(hyperchannelinfo[hyperchannelId]).length;
+		//const otherChannelsAmount = Object.keys(hyperChannel).length;
 
 		interaction.reply(
-			`${prefaceText}oining hyperchat channel ${hyperchannelId}. Be respectful to others — especially their privacy — `
+			`${prefaceText}oining hyperchat channel ${hyperChannelId}. Be respectful to others — especially their privacy — `
 			+ `and follow Discord's TOS or I will take this feature away for your entire server.\r`
 			+ `Currently ${otherChannelsAmount} channel${otherChannelsAmount > 1 ? "s" : ""} in this hyperchat.`
 		);
 
-		textchannelinfo[channelId].collector = interaction.channel.createMessageCollector({filter, idle: 60_000*timeout});
-		textchannelinfo[channelId].collector.on('collect', async msg =>  {
+		textChannel.collector.on('collect', async msg =>  {
 			//benchmarking
 			let t0 = performance.now();
 
-			await textchannelinfo[channelId]?.goAhead;
-			textchannelinfo[channelId].goAhead = new Promise(function(resolve, reject) {
-				textchannelinfo[channelId].promiseResolve = resolve;
-				textchannelinfo[channelId].promiseReject = reject;
+			await textChannel?.goAhead;
+			textChannel.goAhead = new Promise(function(resolve, reject) {
+				textChannel.promiseResolve = resolve;
+				textChannel.promiseReject = reject;
 			});
 
-			textchannelinfo[channelId].lastRecievedMessageId = msg.id;
+			textChannel.lastRecievedMessageId = msg.id;
 			hypermessageidcache = msg.id;
 
 			let embed = new EmbedBuilder()
@@ -357,10 +370,10 @@ module.exports = {
 			let senderString = "";
 
 			if (!isDM) {
-				
+				//TODO: this should probably be cached.
 				[currentServerInfo, currentServer] = await Promise.all([
-					serverInfo.findOne({where: {serverId: msg.guild.id}}),
-					client.guilds.fetch(msg.guild.id)
+					serverInfo.findOne({where: {serverId: msg.guildId}}),
+					client.guilds.fetch(msg.guildId)
 				])
 				//if you can find the server and see anonymizeName isn't true
 				if (currentServerInfo && !currentServerInfo.get("serverSettings").anonymizeName) {
@@ -373,7 +386,7 @@ module.exports = {
 				anonId = anonymousCache.length;
 				anonymousCache.push(msg.author.id);
 			}
-			
+			//TODO: two awaits... should definitely probably be cached.
 			const { displayName, embedColor, avatarURL } = await resolveName(
 				await msg.author.fetch(true), 
 				msg.member, 
@@ -394,11 +407,11 @@ module.exports = {
 			let urls = ''
 			msg.attachments.forEach(attachment => {
 				content += ` [${attachment.contentType} attachment]`; //show type later
-				urls+=attachment.attachment+"\n";
+				urls += attachment.attachment+"\n";
 			});
 			msg.stickers.forEach(sticker => {
 				content += " [sticker]"; //idk
-				urls += sticker.url+"\n";
+				urls += sticker.url + "\n";
 			})
 
 			//Oftentimes embeds will appear as an update later.
@@ -412,15 +425,11 @@ module.exports = {
 			}
 
 			//asynchronously iterate through all the channels it needs to send a message to
-			Promise.all(Object.keys(hyperchannelinfo[hyperchannelId]).map(async (iteratingChannelId) => {
-				//return if *that's* the channel it was sent from or if it was removed from the hyperchannel
-				if (
-					iteratingChannelId === channelId
-					//Not sure why this second part is here. Do null values appear in the map?
-					|| !hyperchannelinfo[hyperchannelId][iteratingChannelId]
-				) return;
+			Promise.all(hyperChannel.map(async (currentTextChannel) => {
+				//return if *that's* the channel it was sent from or if it was removed from the hyperChannel
+				if (currentTextChannel === textChannel) return;
 
-				const currentChannel = await client.channels.fetch(iteratingChannelId);
+				const currentChannel = await client.channels.fetch(currentTextChannel.id);
 
 				embed.setDescription(content || null);
 				if (msg.type === MessageType.Reply) {
@@ -461,7 +470,7 @@ module.exports = {
 								embed
 							]
 						}).then((msg)=> {
-							textchannelinfo[channelId].promiseResolve();
+							textChannel.promiseResolve();
 						});
 
 						console.log(performance.now()-t0);
@@ -472,28 +481,25 @@ module.exports = {
 				//at this point, all non-continuations go here
 				//send the final message to the selected channel!
 
-				console.log(performance.now()-t0);
+				console.log(performance.now() - t0);
 				currentChannel.send({
-					embeds: [
-						embed
-					]
+					embeds: [embed]
 				}).then((msg)=> {
-					textchannelinfo[channelId].lastSentMessageId = msg.id;
-					textchannelinfo[channelId].promiseResolve();
+					textChannel.lastSentMessageId = msg.id;
+					textChannel.promiseResolve();
 				});
 				if (urls) currentChannel.send(urls);
 			}));
 		});
 
-		textchannelinfo[channelId].collector.on('end', (_collected, reason) => {
-			delete textchannelinfo[channelId]
-			delete hyperchannelinfo[hyperchannelId][channelId]
-
-			//eval if any channels remain
-			if (Object.keys(hyperchannelinfo[hyperchannelId]).length) delete hyperchannelinfo[hyperchannelId];
+		textChannel.collector.on('end', (_collected, reason) => {
+			delete textChannels[textChannelId];
+			hyperChannel.splice(hyperChannel.findIndex(textChannel => textChannel.id === textChannelId), 1);
+			if (!hyperChannel.length) delete hyperChannels[hyperChannelId];
 
 			//Manual and switching reasons are handled earlier.
-			if (reason === "timeout") interaction.channel.send(`Leaving hyperchat channel ${hyperchannelId} due to no one talking; timeout.`);
+			//TODO: send a message from the bot notifying the other textChannels that this one left.
+			if (reason === "timeout") interaction.channel.send(`Leaving hyperchat channel ${hyperChannelId} due to no one talking; timeout.`);
 
 			client.user.setActivity('the phone', {type: ActivityType.Listening})
 			
