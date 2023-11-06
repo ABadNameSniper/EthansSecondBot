@@ -46,3 +46,4 @@ maybe lint the source code?
 
 make menu system more encompassing instead of having the same menu code pasted on 4 different commands
 
+some variety of flavor text when joining and leaving hyperchannels could be fun

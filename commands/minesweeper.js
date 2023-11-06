@@ -116,20 +116,17 @@ module.exports = {
             for (let i = 0; i < visibleField.length; i++) {
                 gameDisplayString += letterChars.substring(i*2, i*2 + 2);
                 for (let j = 0; j < visibleField[i].length; j++) {
-                    if (visibleField[i][j] === 9) {
-                        gameDisplayString += ':boom:';
+                    if (field[i][j] === 9) {
+                        gameDisplayString += !visibleField[i][j] 
+                            ? "💣"
+                            : ":boom:"
                     } else {
-                        if (field[i][j] === 9) {
-                            gameDisplayString += "💣";
-                        } else {
-                            gameDisplayString += numberEmojis[field[i][j]];
-                        }
+                        gameDisplayString += numberEmojis[field[i][j]];
                     }
                 }
-                gameDisplayString += letterChars.substring(i*2,i*2+2) + '\n';
+                gameDisplayString += letterChars.substring(i*2, i * 2 + 2) + '\n';
             }
-            gameDisplayString += topString;
-            gameDisplayString += additionalMessage;
+            gameDisplayString += topString + additionalMessage;
 
             for (let msgActionRow of rows) {
                 for (let component of msgActionRow.components) {
@@ -385,9 +382,6 @@ module.exports = {
                     switch (visibleField[i][j]) {
                         case ("flag"):
                             gameDisplayString += '\uD83D\uDEA9';
-                            break;
-                        case (9):
-                            gameDisplayString += ":boom:";
                             break;
                         case (false):
                             gameDisplayString += '⬜';
