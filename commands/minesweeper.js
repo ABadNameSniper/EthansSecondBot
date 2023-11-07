@@ -183,7 +183,7 @@ module.exports = {
         if (interaction.options.getInteger('mines')) {
             difficulty = 'Custom';
             minesAmount = interaction.options.getInteger('mines');
-            if (minesAmount<1) {
+            if (minesAmount < 1) {
                 interaction.reply("You must have at least 1 mine!")
                 return;
             }
@@ -470,8 +470,9 @@ module.exports = {
         );
         playerData[userId].messageCollector = interaction.channel.createMessageCollector({filter, time: 14.5*60_000});
         playerData[userId].messageCollector.on('collect', msg => {
-            //figure out x and y based on input
+            //figure out x and y based on text input
             const content = msg.content.toUpperCase();
+            if (!content) return;
             if (msg.deletable) msg.delete();
             let playerInfo = playerData[userId];
             if (content === "F") {
@@ -493,7 +494,7 @@ module.exports = {
                 } else if (third) {
                     playerInfo.y = third.charCodeAt(0) - 65;
                 }
-            } else {//single digit, assume letter
+            } else if (second) {//single digit, assume letter
                 playerInfo.y = second.charCodeAt(0) - 65;
             }
             playerInfo.x = parseInt(playerInfo.x);

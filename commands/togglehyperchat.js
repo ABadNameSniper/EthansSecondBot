@@ -64,7 +64,7 @@ const hyperMessageCache = {
 const anonymousCache = [];
 
 const fullyResolveName = async function(user, member) {
-	var anonId = anonymousCache.findIndex(element => element === ((user||member).id));
+	var anonId = anonymousCache.findIndex(element => element === (user||member).id);
 	if (anonId === -1) anonId = anonymousCache.push(user.id) - 1;
 	return await resolveName(
 		user,
