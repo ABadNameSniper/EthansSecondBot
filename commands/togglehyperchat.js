@@ -31,7 +31,6 @@ const textChannels = {
 		collector: collector,
 		privateConnection: false,
 		lastRecievedMessageId: msg.id, actually could be worth keeping in conjunction...
-		goAhead: new Promise
 	}
 	*/
 
@@ -59,20 +58,17 @@ const hyperMessageCache = {
 			"78324982343": 832489123432,
 		}
 	}
-
-
 	*/
 }
 
 const anonymousCache = [];
 
-const fullyResolveName = async function(user, member, isDM) {
-	var anonId = anonymousCache.findIndex(element => element === user.id);
+const fullyResolveName = async function(user, member) {
+	var anonId = anonymousCache.findIndex(element => element === ((user||member).id));
 	if (anonId === -1) anonId = anonymousCache.push(user.id) - 1;
 	return await resolveName(
-		await user.fetch(true), //hex accent color should be cached to avoid this
+		user,
 		member, 
-		isDM, 
 		anonId
 	);
 }
@@ -141,14 +137,6 @@ const updateEmbeds = async function(oldmsg, newmsg, client) {
 		allOldEmbeddables = allOldEmbeddables.concat(oldEmbeddables);
 	}
 
-	//Going through the release, I have no idea what .goAhead is for
-	//upon further examination I think it's to wait until the previous message's sending/editing
-	// has been confirmed to have been recieved before sending a new one.
-	// Seems unnecessary, will probably remove next update.
-	// if (textChannels[oldmsg.channelId].goAhead) {
-	// 	await textChannels[oldmsg.channelId].goAhead;
-	// }
-
 	Promise.all(
 		textChannels[oldmsg.channelId].hyperChannel.map(async (currentTextChannel) => {
 		if (currentTextChannel.id === oldmsg.channelId) return;
@@ -162,16 +150,10 @@ const updateEmbeds = async function(oldmsg, newmsg, client) {
 
 				//Using resolveName to search for a user, not display who they are this time!
 				//This is because I had a terrible idea to search old messages, instead of utilize a cache.
-				const { displayName, avatarURL} = await resolveName(
-					oldmsg.author,
-					oldmsg.member, 
-					oldmsg.channel.isDMBased(), 
-					anonymousCache.findIndex(element => element === oldmsg.author.id)
-				);
+
+				const { displayName, avatarURL } = await fullyResolveName(oldmsg.channel.isDMBased() && oldmsg.author, oldmsg.member);
 
 				if (message.embeds?.[0]?.data?.type === "rich") {
-
-
 					//Genius authentication
 					const indexOfBar = message.embeds[0].author.name.indexOf("|");
 					const offset = indexOfBar === -1 
@@ -332,7 +314,7 @@ module.exports = {
 		//Set a timeout time, default of 7 minutes. Max of 14 minutes due to dropping listeners past 15.
 		const timeout = Math.min(interaction.options.getInteger('timeout'), 14) || 7;
 		//i check if hci has a hcID like 3 times. condense later?
-		if (!hyperChannels[hyperChannelId]) hyperChannels[hyperChannelId] = [];
+		hyperChannels[hyperChannelId] ??= [];
 		const hyperChannel = hyperChannels[hyperChannelId];
 		
 		textChannels[textChannelId] = {
@@ -349,7 +331,7 @@ module.exports = {
 		
 		//I will probably want to set this as a textChannel property in the next update
 		const channelName = channel.name 
-			|| `${(await fullyResolveName(interaction.user, interaction.member, true)).displayName}'s DMs`;
+			|| `${(await fullyResolveName(interaction.user)).displayName}'s DMs`;
 
 		for (const textChannel of hyperChannel) {
 			textChannel.channel.send(`${channelName} has joined the hyperchannel. Total connected: ${hyperChannel.length + 1}`);
@@ -376,18 +358,11 @@ module.exports = {
 			//benchmarking
 			let t0 = performance.now();
 
-			// await textChannel?.goAhead;
-			// textChannel.goAhead = new Promise(function(resolve, reject) {
-			// 	textChannel.promiseResolve = resolve;
-			// 	textChannel.promiseReject = reject;
-			// });
-
+			//hyperMessageCache[msg.id] = {}; //This will replace the previous two lines (and be a memory leak if I'm not careful)
 			textChannel.lastRecievedMessageId = msg.id;
 			hypermessageidcache = msg.id;
 
-			hyperMessageCache[msg.id] = {};
-
-			const { displayName, embedColor, avatarURL } = await fullyResolveName(msg.author, msg.member, isDM);
+			const { displayName, embedColor, avatarURL } = await fullyResolveName(isDM && msg.author, msg.member);
 
 			senderString = `${displayName} | ${channelName}`
 			if (!isDM && !currentServerInfo.get("serverSettings").anonymizeName) senderString += ` | ${interaction.guild.name}`;
@@ -437,24 +412,24 @@ module.exports = {
 					const repliedToMessage = await msg.fetchReference();
 					if (repliedToMessage.author.id === clientId && repliedToMessage.embeds?.[0]?.author?.name) {
 						embed.setFooter({text:
+							//TODO: get just the authors name when I work with message caching.
 							`${repliedToMessage.embeds[0].author.name}: ${repliedToMessage.embeds[0].description}`
 						})
 					} else {
 						//otherwise reply like this, getting some more information about the author's display name
-						const { displayName } = await resolveName(
-							repliedToMessage.author, 
-							repliedToMessage.member, 
-							isDM, 
-							anonymousCache.findIndex(element => element === msg.author.id)
+						const { displayName } = await fullyResolveName(
+							isDM && repliedToMessage.author, 
+							repliedToMessage.member
 						);
 						embed.setFooter({text:
 							`${displayName}: ${repliedToMessage.content}`
 						})
 					}
 				} else {
-					const lastMessage = (await currentChannel.messages.fetch({limit:1})).first();
+					const lastMessage = (await currentChannel.messages.fetch({limit: 1})).first();
 					//If it's a hyperchat by the same person without a reply to someone, 
-					//just edit onto the previous message to avoid spamming everything up (things look nice)
+					//just edit onto the previous message to avoid spamming everything up
+					//it looks nice, but costs over a tenth of a second on my internet connection
 					if (
 						lastMessage?.embeds?.[0]?.author?.name === senderString
 						&& !lastMessage?.embeds?.[0]?.footer
@@ -463,15 +438,12 @@ module.exports = {
 							lastMessage.embeds[0].description + "\n " + content
 						);
 
-						if (urls!=='') await currentChannel.send(urls)
+						if (urls) currentChannel.send(urls)
 						lastMessage.edit({
 							embeds: [
 								embed
 							]
 						})
-						// .then((msg)=> {
-						// 	textChannel.promiseResolve();
-						// });
 
 						console.log(performance.now() - t0);
 						return;
@@ -484,10 +456,7 @@ module.exports = {
 				console.log(performance.now() - t0);
 				currentChannel.send({
 					embeds: [embed]
-				}).then((msg)=> {
-					textChannel.lastSentMessageId = msg.id;
-					//textChannel.promiseResolve();
-				});
+				}).then(msg => textChannel.lastSentMessageId = msg.id);
 				if (urls) currentChannel.send(urls);
 			}));
 		});

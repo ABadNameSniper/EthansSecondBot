@@ -107,7 +107,7 @@ module.exports = {
             };
             let displayString = "";
             const promises = foundModels.map(async (foundModel) => {
-                const { displayName } = await resolveName(await client.users.fetch(foundModel.userInfoUserId), null, false, "ymous");
+                const { displayName } = await resolveName(await client.users.fetch(foundModel.userInfoUserId), null, "ymous");
                 let serverName;
                 try {
                     serverName = foundModel.serverInfoServerId === globalAndTestGuildId || !foundModel.serverInfoServerId

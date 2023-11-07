@@ -29,9 +29,7 @@ modifying discordjs's user caching system to include blacklist levels and hyperc
 
 was checking permissions for trigger words necessary? It might've been easy just to do better error handling.
 
-should've done better caching for users on top of discord.js
-
-change privacy settings to more accurately reflect display name vs username
+change anonymity level setting to: username, display, and anonymous
 
 fix weird double embedding bug with hyperchats?
 

@@ -1,5 +1,3 @@
-//TODO: there's a certain double for loop that appears. Maybe I could make it a function
-
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { ActionRowBuilder, ButtonBuilder,  ButtonStyle, ComponentType } = require('discord.js');
 const indexRoot = process.cwd()
@@ -41,7 +39,7 @@ const topStringOG = [
     "💣",":zero:",":one:",":two:",":three:",":four:",":five:",":six:",":seven:",":eight:",":nine:",
     ":keycap_ten:",":bangbang:", "12 ", "13 ", "14 ", "15 ", "16 ", "17 ", "18 ", "19 ", "💣","\n"
 ];
-const letterChars = '🇦🇧🇨🇩🇪🇫🇬🇭🇮🇯🇰🇱🇲🇳🇴🇵🇶🇷🇸🇹🇺🇻🇼🇽';//pls automate by turning ints into chars or something
+const letterChars = '🇦🇧🇨🇩🇪🇫🇬🇭🇮🇯🇰🇱🇲🇳🇴🇵🇶🇷🇸🇹🇺🇻🇼🇽';
 const numberEmojis = ['🟦', ':one:', ':two:', ':three:', ':four:', ':five:', ':six:', ':seven:', ':eight:'];
 
 const searchAndSetStyle = function(customId, style, rows, toggleStyle) {
@@ -246,8 +244,8 @@ module.exports = {
             for (i; i < height + width + 1; i++) {
                 currentMAR.addComponents(
                     new ButtonBuilder()
-                    .setCustomId(String.fromCharCode(i+64-width))
-                    .setLabel(String.fromCharCode(i+64-width))
+                    .setCustomId(String.fromCharCode(i + 64 - width))
+                    .setLabel(String.fromCharCode(i + 64 - width))
                     .setStyle(ButtonStyle.Primary)
                 );
                 if ((i + 1) % 5 === 0 || i === height + width) {
@@ -322,9 +320,7 @@ module.exports = {
             delete playerInfo.lastXButton;
             delete playerInfo.lastYButton;
 
-            if (!initialClickTime) {//don't use performance.now
-                initialClickTime = Date.now()
-            }
+            initialClickTime ??= Date.now()
 
             if (flagging) {
                 //flagging and unflagging
