@@ -114,13 +114,11 @@ module.exports = {
             for (let i = 0; i < visibleField.length; i++) {
                 gameDisplayString += letterChars.substring(i*2, i*2 + 2);
                 for (let j = 0; j < visibleField[i].length; j++) {
-                    if (field[i][j] === 9) {
-                        gameDisplayString += !visibleField[i][j] 
-                            ? "💣"
-                            : ":boom:"
-                    } else {
-                        gameDisplayString += numberEmojis[field[i][j]];
-                    }
+                    gameDisplayString += field[i][j] === 9
+                        ? visibleField[i][j] === true //Explicit true, to exclude flags
+                            ? ":boom:"
+                            : "💣"
+                        : numberEmojis[field[i][j]];
                 }
                 gameDisplayString += letterChars.substring(i*2, i * 2 + 2) + '\n';
             }
