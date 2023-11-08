@@ -15,22 +15,24 @@ blacklistItem.sync();
 const resolveName = require('./../utils/resolvename');
 const { EmbedBuilder, MessageType, ActivityType } = require('discord.js');
 
-//It'd probably be better if I could just put listeners directly into the channels. TODO
 const messageUpdate = require('./../events/messageUpdate').emitter;
 const messageDelete = require('./../events/messageDelete').emitter;
 
-const embeddablesCollectionMetaTypes = ['embeds', 'attachments', 'stickers']
+//so basically these three things behave similarly enough
+const embeddablesCollectionMetaTypes = ['embeds', 'attachments', 'stickers'];
 
 const textChannels = {
 	/*
 	'1243798753': {
 		channel: 
-		//id: '1243798753',
+		id: '1243798753',
 		hyperChannelId: '1', //necessary because the hyperchannels are arrays of textChannel objects and cannot store their own ID
 		hyperChannel: hyperChannel
 		collector: collector,
 		privateConnection: false,
-		lastRecievedMessageId: msg.id, actually could be worth keeping in conjunction...
+		hyperMessageCache = {
+			"38923482394": [Message, Message]
+		}
 	}
 	*/
 
@@ -40,25 +42,6 @@ const hyperChannels = {
 	'123456' : [textChannel, textChannel]
 	'789101' : [textChannel]
 */
-}
-
-//This cache isn't so good. It just records the last message id. 
-//A better implementation would be an entire array or something.
-var hypermessageidcache;
-
-const hyperMessageCache = {
-	/*
-	"102039847832": { //Original message ID
-		originalChannel: "12897123489" 
-		author/authorDisplay?:
-		otherChannels: {
-			//Should be channelId/messageId pair so as to be able to easily drop channels from the message cache
-			//when they leave the hyperchat
-			"83298234793": 018723498234,
-			"78324982343": 832489123432,
-		}
-	}
-	*/
 }
 
 const anonymousCache = [];
@@ -100,26 +83,18 @@ const getUniqueEmbeddables = function(newEmbeddablesCollection, oldEmbeddablesCo
 	return [uniqueEmbeddables, commonEmbeddables];
 }
 
-const updateEmbeds = async function(oldmsg, newmsg, client) {
-	//Gate out bots and the channel the message was sent in
-	if (oldmsg?.author?.bot || !Object.keys(textChannels).includes(oldmsg.channelId)) return;
+const updateMessage = async function(oldmsg, newmsg) {
+	if (oldmsg?.author?.bot) return
 
-	let scansets; //amount of images to fetch
-	let scanreps; //upper limit to retry
-	if (hypermessageidcache === oldmsg.id) {
-		console.log('Updated message was the last hypermessage of all hyperChannels');
-		scansets = 2;
-		scanreps = 1;
-	} else if (textChannels[oldmsg.channelId].lastRecievedMessageId === oldmsg.id){
-		console.log('Updated message was the last hypermessage in this textchannel')
-		scansets = 4;
-		scanreps = 3;
-	} else {
-		//could be capped by finding the hyperChannel origin
-		console.log("Couldn't find updated message as a last message. Widening search.")
-		scansets = 10;
-		scanreps = 5;
-	}
+	const oldTextChannel = textChannels[oldmsg.channelId];
+
+	if (!oldTextChannel) return;
+
+	const messageReceipt = oldTextChannel.hyperMessageCache[oldmsg.id];
+
+	if (!messageReceipt) return;
+
+	const hyperChannel = oldTextChannel.hyperChannel
 
 	let allNewEmbeddables = [], allCommonEmbeddables = [], allOldEmbeddables = [];
 	for (const type of embeddablesCollectionMetaTypes) {
@@ -137,93 +112,71 @@ const updateEmbeds = async function(oldmsg, newmsg, client) {
 		allOldEmbeddables = allOldEmbeddables.concat(oldEmbeddables);
 	}
 
-	Promise.all(
-		textChannels[oldmsg.channelId].hyperChannel.map(async (currentTextChannel) => {
-		if (currentTextChannel.id === oldmsg.channelId) return;
-		let lastScannedMessage = null;
-		const currentChannelMessages = (await client.channels.fetch(currentTextChannel.id)).messages;
-		for (let i = 0; i < scanreps; i ++) {
-			for (const [msgid, message] of await currentChannelMessages.fetch({limit: scansets, before: lastScannedMessage})) {
-				//reading through this, it looked like it should've been continue. Originally break
-				//Just checking if it was sent by the bot
-				if (message.author.id !== clientId) continue;
+	if (!newmsg) delete oldTextChannel.hyperMessageCache[oldmsg.id]; 
 
-				//Using resolveName to search for a user, not display who they are this time!
-				//This is because I had a terrible idea to search old messages, instead of utilize a cache.
+	for (let message of messageReceipt) {
+		//Check if the channel left the hyperchannel
+		if (!textChannels[message.channelId].hyperChannel === hyperChannel) return; 
+		
+		if (message.embeds?.[0].data?.type === "rich") {
+			//the ONLY embed since it's a normal hyperchat rich embed
 
-				const { displayName, avatarURL } = await fullyResolveName(oldmsg.channel.isDMBased() && oldmsg.author, oldmsg.member);
+			//get the fresh message in case it's been added on to
+			message = await message.fetch()
+			const editEmbed = message.embeds?.[0];
+			const desc = editEmbed.data.description;
+			const newContentIndex = editEmbed.data.description.indexOf(oldmsg?.content);
+			let newDescription = 
+				desc.slice(0, newContentIndex) + 
+				(newmsg?.content || "") + 
+				//newDescription has to be set this way instead of .replace so I can take any possible newlines out.
+				desc.slice(newContentIndex + oldmsg?.content.length).trim()
+				//After review, I'm not sure what this replace is for
+				.replace(/\\/g, '/'); 
 
-				if (message.embeds?.[0]?.data?.type === "rich") {
-					//Genius authentication
-					const indexOfBar = message.embeds[0].author.name.indexOf("|");
-					const offset = indexOfBar === -1 
-						? 0 
-						: indexOfBar + 2;
-					const adjustedEmbedName = message.embeds[0].author.name.slice(offset, message.embeds[0].author.name.length);
-					if (adjustedEmbedName === displayName && message.embeds[0].author.iconURL === avatarURL) {
-						//the ONLY embed since it's a normal hyperchat rich embed
-						let editedEmbed = message.embeds[0];
-						let newDescription = editedEmbed.data.description.replace(oldmsg.content, newmsg?.content || '');
-						//Simply deleting the hyperchat if the original was deleted.
-						if (!newDescription.length) {
-							message.delete();
-							return;
-						}
-						editedEmbed.data.description = (
-							newDescription
-						);
-						message.edit({
-							embeds: [editedEmbed]
-						});
-
-						//Reply to rich text with list of URLs for Discord to automatically embed
-
-						//After review, I'm not sure what this replace is for
-						newDescription = newDescription.replace(/\\/g, '/'); 
-						allURLs = allNewEmbeddables.map(newEmbeddable => {
-							newDescription = newDescription
-								.replace(new RegExp(newEmbeddable.url, 'g'),` [${newEmbeddable.type}]`);
-							return newEmbeddable.url;
-						}).join("\n").toString();
-						message.reply(allURLs);
-
-						//The rich embed comes *before* the additional embeds, meaning the for loop
-						//will get to them after, meaning if it finds it, everything else should
-						//have already been done.
-						return; 
-					}
-				} else {
-					//This is for normal embeds within messages that reply to those rich embed messages
-
-					let newcontent = message.content;
-
-					for (const oldEmbeddable of allOldEmbeddables) {
-						newcontent = newcontent.replace(oldEmbeddable.url, `[deleted ${oldEmbeddable.type}]`)
-					}
-
-					//only edit content, embeds come automagically
-					if (!newcontent.length) {
-						message.delete();
-						return;
-					}
-					message.edit(newcontent);
-
-					//Not perfect
-					succesfulUpdate = true;
-				}
-				console.log("continuing scanning, ", scanreps, " and ", scansets);
-				lastScannedMessage = message.id;
+			//Simply deleting the hyperchat if the original was deleted and there weren't merged messages.
+			if (!newDescription.length) {
+				message.delete();
+				return;
 			}
+			
+			//Reply to rich text with list of URLs for Discord to automatically embed
+			allURLs = allNewEmbeddables.map(newEmbeddable => {
+				newDescription = newDescription.replace(
+					new RegExp(newEmbeddable.url, 'g'),` [${newEmbeddable.type}]`
+				);
+				return newEmbeddable.url;
+			});
+			editEmbed.data.description = (
+				newDescription
+			);
+			message.edit({
+				embeds: [editEmbed]
+			});
+			if (allURLs.length) message.reply(allURLs.join("\n"));
+	
+		} else {
+			//This is for normal embeds within messages that reply to those rich embed messages
+
+			let newcontent = message.content;
+
+			for (const oldEmbeddable of allOldEmbeddables) {
+				newcontent = newcontent.replace(oldEmbeddable.url, `[deleted ${oldEmbeddable.type}]`)
+			}
+
+			//only edit content, embeds come automagically
+			if (!newcontent.length) {
+				message.delete();
+				return;
+			}
+			message.edit(newcontent);
 		}
-		if (!succesfulUpdate) oldmsg.author.send(
-			"Couldn't edit/delete hypermessage: " + oldmsg.url + "\n let an admin know about your issue!"
-		);
-	}))
+	}
 };
 
-messageDelete.on('messageDelete', updateEmbeds);
+messageDelete.on('messageDelete', updateMessage);
 //Note: message updates occur frequently because links embed even just a couple seconds after a message is sent 
-messageUpdate.on('messageUpdate', updateEmbeds);
+messageUpdate.on('messageUpdate', updateMessage);
 
 
 const filter = msg => msg.content != null && !msg.author.bot;
@@ -325,7 +278,8 @@ module.exports = {
 				interaction.options.getInteger('hyperChannelId') < 0 && blSeverity < 1 
 					? true 
 					: false,//if random or otherwise...
-			collector: channel.createMessageCollector({filter, idle: 60_000*timeout})
+			collector: channel.createMessageCollector({filter, idle: 60_000*timeout}),
+			hyperMessageCache: {},
 		};
 		textChannel = textChannels[textChannelId];
 		
@@ -346,8 +300,6 @@ module.exports = {
 			client.user.setActivity(`HC-${hyperChannelId}`, {type: ActivityType.Listening});
 		}
 
-		//const otherChannelsAmount = Object.keys(hyperChannel).length;
-
 		interaction.reply(
 			`${prefaceText}oining hyperchat channel ${hyperChannelId}. Be respectful to others — especially their privacy — `
 			+ `and follow Discord's TOS or I will take this feature away for your entire server.\r`
@@ -358,15 +310,13 @@ module.exports = {
 			//benchmarking
 			let t0 = performance.now();
 
-			//hyperMessageCache[msg.id] = {}; //This will replace the previous two lines (and be a memory leak if I'm not careful)
-			textChannel.lastRecievedMessageId = msg.id;
-			hypermessageidcache = msg.id;
-
 			const { displayName, embedColor, avatarURL } = await fullyResolveName(isDM && msg.author, msg.member);
 
 			senderString = `${displayName} | ${channelName}`
 			if (!isDM && !currentServerInfo.get("serverSettings").anonymizeName) senderString += ` | ${interaction.guild.name}`;
 			
+			textChannel.hyperMessageCache[msg.id] = []
+			const hyperMessage = textChannel.hyperMessageCache[msg.id];
 
 			let embed = new EmbedBuilder()
 			embed.setColor(embedColor);
@@ -379,14 +329,14 @@ module.exports = {
 			//TODO: do this with @ing roles and users too.
 			let content = msg.content.replace("@everyone", "@ everyone").replace("@here", "@ here") || '';//certified js moment
 
-			let urls = ''
+			const urls = [];
 			msg.attachments.forEach(attachment => {
 				content += ` [${attachment.contentType} attachment]`; //show type later
-				urls += attachment.attachment+"\n";
+				urls.push(attachment.attachment);
 			});
 			msg.stickers.forEach(sticker => {
 				content += " [sticker]"; //idk
-				urls += sticker.url + "\n";
+				urls.push(sticker.url);
 			})
 
 			//Oftentimes embeds will appear as an update later.
@@ -396,7 +346,7 @@ module.exports = {
 				content = content
 					.replace(/\\/g, '/')
 					.replace(new RegExp(userEmbed.data.url, 'g'),` [${userEmbed.data.type} embed]`)
-				urls += userEmbed.data.url + "\n";
+				urls.push(userEmbed.data.url);
 			}
 
 			//asynchronously iterate through all the channels it needs to send a message to
@@ -438,12 +388,12 @@ module.exports = {
 							lastMessage.embeds[0].description + "\n " + content
 						);
 
-						if (urls) currentChannel.send(urls)
+						if (urls.length) currentChannel.send(urls)
 						lastMessage.edit({
 							embeds: [
 								embed
 							]
-						})
+						}).then(msg => hyperMessage.push(msg));
 
 						console.log(performance.now() - t0);
 						return;
@@ -456,8 +406,8 @@ module.exports = {
 				console.log(performance.now() - t0);
 				currentChannel.send({
 					embeds: [embed]
-				}).then(msg => textChannel.lastSentMessageId = msg.id);
-				if (urls) currentChannel.send(urls);
+				}).then(msg => hyperMessage.push(msg));
+				if (urls.length) currentChannel.send(urls.join("\n"));
 			}));
 		});
 
