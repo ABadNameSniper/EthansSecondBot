@@ -419,6 +419,7 @@ module.exports = {
 			delete textChannels[textChannelId];
 			if (!hyperChannel.length) delete hyperChannels[hyperChannelId];
 
+			//TODO: timeout message is brokey
 			//Manual and switching reasons are handled earlier.
 			if (reason === "timeout") channel.send(`Leaving hyperchat channel ${hyperChannelId} due to no one talking; timeout.`);
 

@@ -1,23 +1,29 @@
 Ethan's Second Bot
 
-
-
-i removed some some dependencies from package.json in an effort to clean this up. They may need to be reinstalled
+It's another fun project, brought to you by -- well I'm sure you can guess.
+It has pretty good minesweeper and frequent updates.
+Thank you so much Dragonhelm for the profile picture!
 
 ## TODO
 
-
+### Broadcasts
+broadcasting system should be it's own DB table or something
 support private broadcast channels
-
 better error handling for broadcasts transmissions to unallowed channels (dm server owner?)
+remove permissionHierarchy.broadcasts, put that all into the database. Dynamic categories or something
+
+### Hyperchats
+Hyperchats in threads update: maybe make it an optional argument, and the default can be set with serverSettings
+fix weird double embedding bug with hyperchats?
+replying to hyperchats should reply to the original message -- MAYBE
+some variety of flavor text when joining and leaving hyperchannels could be fun
+decide on "hyperchats" or "hyperchannels" maybe. It's a weird mix of both right now.
+
+### Misc.
 
 /introlist should just be a page in /settings
 
-broadcasting system should be it's own DB table or something
-
 /flipbook new/edit/delete/editSettings command and subcommand!! that would be fun
-
-Hyperchats in threads update: maybe make it an optional argument, and the default can be set with serverSettings
 
 rewrite editing system so that it caches sent message ids (send.then(;alskdjf;asf))
 
@@ -25,23 +31,13 @@ convert everything into ES modules instead of CJS
 
 replace discord-tts with a better solution using just the normal google-tts-api
 
-modifying discordjs's user caching system to include blacklist levels and hyperchat messages would've been useful. Maybe next time.
-
-was checking permissions for trigger words necessary? It might've been easy just to do better error handling.
+Is checking permissions for trigger words necessary? It might be easier just to do better error handling.
 
 change anonymity level setting to: username, display, and anonymous
-
-fix weird double embedding bug with hyperchats?
 
 combine serverInfoDefault/userInfoDefault into something much, much better. Eliminate all rogue FindOnes
 + provide the user row to each command (with verification/permissions) in the command handler, as a second argument
 
-replying to hyperchats should reply to the original message
- 
-remove permissionHierarchy.broadcasts, put that all into the database. Dynamic categories or something
-
 maybe lint the source code?
 
-make menu system more encompassing instead of having the same menu code pasted on 4 different commands
-
-some variety of flavor text when joining and leaving hyperchannels could be fun
+make menu system more encompassing instead of having the same menu code pasted on 4 different command

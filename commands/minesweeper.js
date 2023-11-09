@@ -310,7 +310,11 @@ module.exports = {
         const inputFunction = function(playerInfo) {
             const { x, y, lastXButton, lastYButton, flagging} = playerInfo
 
-            if (!(x >= 0 && y >= 0 && x < width && y < height)) return;
+            if (
+                x == null || y == null || //Check if nullish
+                isNaN(x) || isNaN(y) || //Check if not a number
+                x < 0 || y < 0 || x >= width || y >= height //check if out of bounds
+            ) return;
 
             searchAndSetStyle(playerInfo.lastYButton, ButtonStyle.Primary, rows);
             searchAndSetStyle(playerInfo.lastXButton, ButtonStyle.Secondary, rows);
