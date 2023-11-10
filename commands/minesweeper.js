@@ -70,6 +70,27 @@ const safeSurroundings = function(field, y, x, func) {
     }
 }
 
+const prepareMessage = function(field, visibleField, topString, additionalMessage) {
+    let gameDisplayString = topString;
+    for (let i = 0; i < visibleField.length; i++) {
+        gameDisplayString += letterChars.substring(i*2, i*2 + 2);
+        for (let j = 0; j < visibleField[i].length; j++) {
+            switch (visibleField[i][j]) {
+                case ("flag"):
+                    gameDisplayString += '\uD83D\uDEA9';
+                    break;
+                case (false):
+                    gameDisplayString += '⬜';
+                    break;
+                default:
+                    gameDisplayString += numberEmojis[field[i][j]];
+            }
+        }
+        gameDisplayString += letterChars.substring(i*2, i*2 + 2) + "\n";
+    }
+    return gameDisplayString + topString + additionalMessage;
+}
+
 module.exports = {
     guildCommand: false,
     severityThreshold: 2,
@@ -106,23 +127,11 @@ module.exports = {
 	async execute(interaction) {
         const userId = interaction.user.id
         
-        const endGame = function(additionalMessage, scaryOutside) {
+        const endGame = function(additionalMessage) {
             playerData[userId]?.buttonCollector?.stop();//had an err where buttonCollector didn't exist. Weird.
             playerData[userId]?.messageCollector?.stop();
-            if (scaryOutside) return;
-            gameDisplayString = topString;
-            for (let i = 0; i < visibleField.length; i++) {
-                gameDisplayString += letterChars.substring(i*2, i*2 + 2);
-                for (let j = 0; j < visibleField[i].length; j++) {
-                    gameDisplayString += field[i][j] === 9
-                        ? visibleField[i][j] === true //Explicit true, to exclude flags
-                            ? ":boom:"
-                            : "💣"
-                        : numberEmojis[field[i][j]];
-                }
-                gameDisplayString += letterChars.substring(i*2, i * 2 + 2) + '\n';
-            }
-            gameDisplayString += topString + additionalMessage;
+
+            gameDisplayString = prepareMessage(field, visibleField, topString, additionalMessage);
 
             for (let msgActionRow of rows) {
                 for (let component of msgActionRow.components) {
@@ -135,9 +144,9 @@ module.exports = {
             );
         }
         //if there's been a previous game and it hasn't been ended
-        if (playerData?.[userId]?.gameEnd === false) {
-            endGame("Ending game, it looks like a new one was started.", true)
-            //stop collectors?
+        if (!playerData?.[userId]?.gameEnd) {
+            playerData[userId]?.buttonCollector?.stop();//had an err where buttonCollector didn't exist. Weird.
+            playerData[userId]?.messageCollector?.stop();
         }
 
         playerData[userId] = {
@@ -147,7 +156,6 @@ module.exports = {
             lastYButton: null,
             flagging: false,
             gameEnd: false
-            //
             //the collectors too
         }
 
@@ -288,17 +296,13 @@ module.exports = {
                 }
             }
         }
-        let gameDisplayString = topString;
-        for (let i = 0; i < visibleField.length; i++) {
-            gameDisplayString += letterChars.substring(i*2, i*2 + 2);
-            for (let j = 0; j < visibleField[i].length; j++) {
-                gameDisplayString+='⬜';
-            }
-            gameDisplayString += letterChars.substring(i*2, i*2 + 2) + '\n';
-        }
-        gameDisplayString +=
-            topString
-            + `\nDifficulty: ${difficulty} | Total Mines: ${minesAmount} | Mines Left: ${minesAmount-flagsAmount}`;
+
+        let gameDisplayString = prepareMessage(field, 
+            visibleField, 
+            topString, 
+            `\nDifficulty: ${difficulty} | Total Mines: ${minesAmount} | Mines Left: ${minesAmount-flagsAmount}`
+        )
+
         const message = await interaction.reply({
             content: gameDisplayString,
             components: rows,
@@ -322,7 +326,7 @@ module.exports = {
             delete playerInfo.lastXButton;
             delete playerInfo.lastYButton;
 
-            initialClickTime ??= Date.now()
+            initialClickTime ??= Date.now();
 
             if (flagging) {
                 //flagging and unflagging
@@ -372,30 +376,15 @@ module.exports = {
                 }
                 
             }
-            //display
-            gameDisplayString = topString;
-            for (let i = 0; i < visibleField.length; i++) {
-                gameDisplayString += letterChars.substring(i*2, i*2 + 2);
-                for (let j = 0; j < visibleField[i].length; j++) {
-                    switch (visibleField[i][j]) {
-                        case ("flag"):
-                            gameDisplayString += '\uD83D\uDEA9';
-                            break;
-                        case (false):
-                            gameDisplayString += '⬜';
-                            break;
-                        default:
-                            gameDisplayString += numberEmojis[field[i][j]];
-                    }
-                }
-                gameDisplayString += letterChars.substring(i*2, i*2 + 2)+"\n";
-            }
-            gameDisplayString +=
-                topString
-                + `\nDifficulty: ${difficulty} |` 
+
+            gameDisplayString = prepareMessage(field, 
+                visibleField, 
+                topString,
+                `\nDifficulty: ${difficulty} |` 
                 + `Total Mines: ${minesAmount} | `
                 + `Mines Left: ${minesAmount-flagsAmount} | `
-                + `Time: ${(Date.now() - initialClickTime)/1000}s`;
+                + `Time: ${(Date.now() - initialClickTime)/1000}s`
+            )
 
             delete playerInfo.x;
             delete playerInfo.y;
@@ -503,7 +492,7 @@ module.exports = {
             inputFunction(playerInfo);
         });
         playerData[userId].buttonCollector.on('collect', i => {
-            if (i.user.id === userId) {//maybe use filter instead
+            if (i.user.id === userId) {
                 i.deferUpdate();
 
                 let playerInfo = playerData[userId];//not sure if i like this system
