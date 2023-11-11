@@ -196,9 +196,10 @@ module.exports = {
         }
 
         //These aren't exclusive, so just make sure they're not on desktop or web.
-        const includeButtons = !interaction?.member?.presence?.clientStatus.desktop
-        && !interaction?.member?.presence?.clientStatus.web
-        || interaction.options.getBoolean("buttons")
+        const includeButtons = 
+            interaction.options.getBoolean("buttons") ??
+            (!interaction?.member?.presence?.clientStatus.desktop
+            && !interaction?.member?.presence?.clientStatus.web)
 
         playerData[userId] = {
             x: null,
