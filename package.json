@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "update-guildcommands": "run-func ./updateCommandsScript.js updateGuildCommands",
+    "update-appcommands": "run-func ./updateCommandsScript.js updateAppCommands",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "contributors": [
@@ -16,9 +18,10 @@
     "@discordjs/rest": "^2.0.0",
     "@discordjs/voice": "^0.16.0",
     "discord-api-types": "^0.37.60",
-    "discord-tts": "^1.2.2",
+    "discord-tts": "^1.0.3",
     "discord.js": "^14.12.1",
     "libsodium-wrappers": "^0.7.13",
+    "run-func": "^3.0.0",
     "sequelize": "^6.33.0",
     "sqlite3": "^5.1.6"
   }

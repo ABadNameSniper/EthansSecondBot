@@ -1,6 +1,7 @@
 const { REST } = require('@discordjs/rest');
 const fs = require('fs');
 const { Routes } = require('discord-api-types/v9');
+const { type } = require('os');
 const indexRoot = process.cwd()
 const { clientId, token, permissionHierarchy } = require(`${indexRoot}/config.json`);
 const rest = new REST({ version: '9' }).setToken(token);
@@ -17,23 +18,21 @@ const adminPermissions = permissionHierarchy.admins.map((id) => {
 })
 
 for (const file of commandFiles) {
-	const command = require(`${commandsFolderPath}/${file}`); 
+    const command = require(`${commandsFolderPath}/${file}`); 
     if (command.guildCommand && !command.guildWhitelist) {
         baseGuildCommands.push(command.data.toJSON());
     } else if (!command.guildWhitelist) {
-	    baseApplicationCommands.push(command.data.toJSON());
+        baseApplicationCommands.push(command.data.toJSON());
     }
 }
 
 //turn null/single guildId to array of guildIds
 const formatGuildIds = async function(guildIds, client) {
-    if (!guildIds) {
-        guildIds = (await client.guilds.fetch()).keys();
-        //guildIds = client.guilds.cache.keys();
-    } else if (typeof(guildIds)==="string") {
-        guildIds = [guildIds];
-    }
-    return guildIds;
+    return !guildIds
+        ? (await client.guilds.fetch()).keys()
+        : (typeof(guildIds) === "string" ) 
+            ? [guildIds]
+            : guildIds
 }
 
 const getCurrentGuildCommands = function(guildCommandNames, guildId, replace) {
@@ -42,7 +41,7 @@ const getCurrentGuildCommands = function(guildCommandNames, guildId, replace) {
     guildCommandNames = commandFiles;//aaaaa
     currentGuildCommands = [];
     for (commandName of guildCommandNames) {
-        const command = require(`${commandsFolderPath}/${commandName}`/*.js`*/);//don't forget slash or something idk
+        const command = require(`${commandsFolderPath}/${commandName}`);//don't forget slash or something idk
         if (
             command.guildCommand //must be a guild command
             && (//if whitelist, must be on whitelist
@@ -67,14 +66,17 @@ module.exports = {
     },
     updateGuildCommands: async function(client, guildIds, guildCommandNames, replace = true) {//replace could be unnecessary
         guildIds = await formatGuildIds(guildIds, client);
+        console.log(guildIds);
         for (const guildId of guildIds) {
             const currentGuildCommands = getCurrentGuildCommands(guildCommandNames, guildId/*, replace*/);
             client.guilds.fetch(guildId).then(guild => {
                 console.log("Updating:", guildId, guild.name);
             })
-            await rest.put(
+            rest.put(
                 Routes.applicationGuildCommands(clientId, guildId),
                 { body: currentGuildCommands}
+            ).then(
+                console.log("awaited for ", guildId)
             )
         }
     },
