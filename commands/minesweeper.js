@@ -35,12 +35,46 @@ var playerData = {
     */
 }
 
-const numberEmojis = [/*'🟦'*/":tada:", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
-const topStringOG = [
-    "💣", "0️⃣", ...numberEmojis.slice(1),
-    " 11 ", " 12 ", " 13 ", " 14 ", " 15 ", " 16 ", " 17 ", " 18 ", " 19 ", " 20 ", " 21 ", " 22 ", " 23 ", " 24 ", " 25 ", "💣","\n"
-];
-const letterChars = '🇦🇧🇨🇩🇪🇫🇬🇭🇮🇯🇰🇱🇲🇳🇴🇵🇶🇷🇸🇹🇺🇻🇼🇽🇾🇿';
+const explosion = "💥";
+const bomb = "💣";
+const numberEmojis = ["🟦", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟", "‼"];
+const maximumLength = 
+    Math.floor(//Get a nice round number in case the other values are tweaked
+        Math.sqrt(( //Arranged in a square
+                2000      //Max amount of characters in a message
+            - 125       //A little more than the amount of characters a lost game over message would be.
+        )/2.89      //worst case scenario, for keycap emoji to bomb ratio
+        )-2       //Remove the borders
+    ) //23
+    + 1; //Just kidding there's one more space since the borders use up less characters than the playing space would
+const maximumDensity = 0.25;
+const maximumMines = Math.floor(maximumLength ** 2 * maximumDensity);
+const largeModeThreshold = 199;//Discord does not display 200 or more emojis in a single message.
+const timeLimit = 14.9*60_000;
+
+const formats = {
+    normal: {
+        letterChars: '🇦🇧🇨🇩🇪🇫🇬🇭🇮🇯🇰🇱🇲🇳🇴🇵🇶🇷🇸🇹🇺🇻🇼🇽🇾🇿',
+        topString: [
+            bomb, "0️⃣", ...numberEmojis.slice(1),
+            ...[...Array(maximumLength - numberEmojis.length).keys()].map((n) => 
+                " " + (n + 11).toString() + " "
+            ),
+            bomb, "\n"
+        ],
+        flag: "🚩"
+    },
+    large: {
+        letterChars:
+            [...Array(maximumLength).keys()].map((n) => String.fromCharCode(97 + n) + " ").join(""),
+        topString : [
+            bomb, ...[...Array(maximumLength).keys()].map((n) =>
+                n + " ".repeat(n % 2 + (n < 10))//Have to deal with weird spacing in codeblocks!
+            ), bomb, "\n"
+        ],
+        flag: "⛳"
+    }
+}
 
 const searchAndSetStyle = function(customId, style, rows, toggleStyle) {
     if (!customId) return;
@@ -70,40 +104,20 @@ const safeSurroundings = function(field, y, x, func) {
     }
 }
 
-const prepareMessage = function(field, visibleField, topString, additionalMessage, updateGridString) {
-    let gameDisplayString = topString;
-    for (let i = 0; i < visibleField.length; i++) {
-        gameDisplayString += letterChars.substring(i*2, i*2 + 2);
-        for (let j = 0; j < visibleField[i].length; j++) {
-            gameDisplayString += updateGridString(i, j, field, visibleField, );
-        }
-        gameDisplayString += letterChars.substring(i*2, i*2 + 2) + "\n";
-    }
-    return gameDisplayString + topString + additionalMessage;
-}
-
-const getGridTile = function(i, j, field, visibleField) {
-    return visibleField[i][j] == "flag"
-        ? '\uD83D\uDEA9'
-        : !visibleField[i][j]
-            ? '⬜'
-            : numberEmojis[field[i][j]]
-}
-
 const difficulties = {
-    Easy: {
+    "Easy": {
         width: 4,
         height: 5,
         mines: 4,
         difficulty: "Easy"
     },
-    Medium: {
+    "Medium": {
         width: 9,
         height: 10,
         mines: 7,
         difficulty: "Medium"
     },
-    Hard: {
+    "Hard": {
         width: 9,
         height: 15,
         mines: 16,
@@ -116,10 +130,10 @@ const difficulties = {
         difficulty: "Very Hard"
     },
     "Maximum": {
-        width: 26,
-        height: 26,
-        mines: 150,
-        difficulty: "Maximum"
+        width: maximumLength,
+        height: maximumLength,
+        mines: maximumMines,
+        difficulty: "Maximum",
     }
 }
 
@@ -135,12 +149,20 @@ module.exports = {
         .addStringOption(option => 
             option.setName('difficulty')
             .setDescription(
-                Object.keys(difficulties).map(
-                    key => `${key}: ${difficulties[key].width}x${difficulties[key].height}💣${difficulties[key].mines}`
-                ).join(" ")
+                "Set the difficulty of the grid. Higher difficulties increase in both size and density of mines."
             )
             .addChoices(
-                ...Object.keys(difficulties).map(key => {return {name: key, value: key}})
+                //Neatly organize all of the difficulties, adding some padding to make reading grid size easy.
+                ...Object.keys(difficulties).map(key => {return {
+                    name: `\`${key}: ${
+                        difficulties[key].width
+                    }x${
+                        difficulties[key].height
+                    }💣${
+                        difficulties[key].mines
+                    }\``, 
+                    value: key
+                }})
             )
         )
         .addIntegerOption(option =>
@@ -152,13 +174,13 @@ module.exports = {
             option.setName("width")
             .setDescription(`Changes grid width. ${customDisclaimer}`)
             .setMinValue(4)
-            .setMaxValue(26)
+            .setMaxValue(maximumLength)
         )
         .addIntegerOption(option =>
             option.setName("height")
             .setDescription(`Changes grid height. ${customDisclaimer}`)
             .setMinValue(4)
-            .setMaxValue(26)
+            .setMaxValue(maximumLength)
         )
         .addBooleanOption(option =>
             option.setName("buttons")
@@ -167,15 +189,22 @@ module.exports = {
 	async execute(interaction) {
         const userId = interaction.user.id
         
-        const endGame = function(additionalMessage) {
-            playerData[userId]?.buttonCollector?.stop();//had an err where buttonCollector didn't exist. Weird.
-            playerData[userId]?.messageCollector?.stop();
+        if (playerData[userId]) {
+            playerData[userId]?.buttonCollector?.stop("new game");
+            playerData[userId].messageCollector.stop("new game");
+        }
 
-            gameDisplayString = prepareMessage(field, visibleField, topString, additionalMessage, (i, j) => {
+        playerData[userId] = {};
+
+        const endGame = function(additionalMessage) {
+            playerData[userId]?.buttonCollector?.stop("game end");
+            playerData[userId].messageCollector.stop("game end");
+
+            gameDisplayString = prepareMessage(additionalMessage, (i, j) => {
                 return field[i][j] === 9
                     ? visibleField[i][j] === true //Explicit true, to exclude flags
-                        ? ":boom:"
-                        : "💣"
+                        ? explosion
+                        : bomb
                     : numberEmojis[field[i][j]];
             });
 
@@ -184,15 +213,33 @@ module.exports = {
                     component.setDisabled(true);
                 }
             }
-            playerData[userId].gameEnd = true;
             interaction.editReply(
                 {content: gameDisplayString, components: rows}
             );
+
+            delete playerData[userId];
         }
-        //if there's been a previous game and it hasn't been ended
-        if (!playerData?.[userId]?.gameEnd) {
-            playerData[userId]?.buttonCollector?.stop();//had an err where buttonCollector didn't exist. Weird.
-            playerData[userId]?.messageCollector?.stop();
+
+        const prepareMessage = function(additionalMessage, updateGridString) {
+            let gameDisplayString = (largeMode && "```\n" || "") + topStringFit;
+            for (let i = 0; i < visibleField.length; i++) {
+                gameDisplayString += 
+                    letterChars.substring(i*2, i*2 + 2);
+                for (let j = 0; j < visibleField[i].length; j++) {
+                    gameDisplayString += updateGridString(i, j, field, visibleField, );
+                }
+                gameDisplayString += 
+                    letterChars.substring(i*2, i*2 + 2) + "\n";
+            }
+            return gameDisplayString + topStringFit + (largeMode && "```\n" || "") + additionalMessage;
+        }
+
+        const getGridTile = function(i, j) {
+            return visibleField[i][j] == "flag"
+                ? flag
+                : !visibleField[i][j]
+                    ? '⬜'
+                    : numberEmojis[field[i][j]]
         }
 
         //These aren't exclusive, so just make sure they're not on desktop or web.
@@ -201,15 +248,6 @@ module.exports = {
             (!interaction?.member?.presence?.clientStatus.desktop
             && !interaction?.member?.presence?.clientStatus.web)
 
-        playerData[userId] = {
-            x: null,
-            y: null,
-            lastXButton: null,
-            lastYButton: null,
-            flagging: false,
-            gameEnd: false
-            //the collectors too
-        }
 
         // let width, height, mines, difficulty;
         const medium = difficulties["Medium"];
@@ -227,6 +265,8 @@ module.exports = {
             }
             : difficulties[interaction.options.getString('difficulty')] ?? medium;
         
+        const largeMode = (width + 2) * (height + 2) > largeModeThreshold;
+
         if (includeButtons && width + height > 24) {
             //maybe change this up when  I add text input
             interaction.reply(
@@ -235,9 +275,9 @@ module.exports = {
             );
             return;
         } 
-        if (mines / (width * height) > 0.4) {
+        if (mines / (width * height) > maximumDensity) {
             interaction.reply(
-                `Sorry, the maximum mine concentration is 40%, you had ${
+                `Sorry, the maximum mine concentration is ${maximumDensity * 100}%, you had ${
                     ((mines / (width * height) * 100).toString()).substring(0, 5)
                 }% concentration.`
             );
@@ -279,12 +319,15 @@ module.exports = {
                     currentMAR = new ActionRowBuilder()
                 }
             }
-        } 
-        const topString = topStringOG.slice(0, width + 1).join('')+'💣\n';
+        }
+
+        const {topString, letterChars, flag} = formats[largeMode && "large" || "normal"];
+        const topStringFit = topString.slice(0, width + 1).join('') + bomb + "\n";
+
         let flagsAmount = 0;
         let squaresDug = 0;
-        let winState;
-        let gameOver = false;
+        let correctFlags = 0;
+        let incorrectFlags = 0;
         const field = Array(height);
         const visibleField = Array(height);
         for (let i = 0; i < field.length; i++) {
@@ -300,8 +343,23 @@ module.exports = {
             visibleField[y][x] = true;
             //Clicked on a mine!
             if (field[y][x] === 9) {
-                winState = false;
-                gameOver = true;
+                for (let i = 0; i < visibleField.length; i++) {
+                    for (let j = 0; j < visibleField[i].length; j++) {
+                        if (visibleField[i][j] === "flag" && field[i][j] === 9) {
+                            correctFlags++;
+                        } else if (visibleField[i][j] === "flag") {
+                            incorrectFlags++;
+                        }
+                    }
+                }
+                endGame(
+                    `Better luck next time!`
+                    + `\nDifficulty: ${difficulty} | `
+                    + `Spaces Dug: ${squaresDug} | ` 
+                    + `Time: ${(Date.now()-initialClickTime)/1000} | `
+                    + `Correct Flags: ${correctFlags} | `
+                    + `Incorrect Flags: ${incorrectFlags}`
+                );
             } else {
                 squaresDug ++;
                 if (field[y][x] === 0) {
@@ -309,19 +367,12 @@ module.exports = {
                         if (!visibleField[i][j]) dig(i, j);
                     })
                 }
-                if (squaresDug === height * width - mines) {
-                    //win
-                    winState = true;
-                    gameOver = true;
-                }
             }
         }
 
-        let gameDisplayString = prepareMessage(field, 
-            visibleField, 
-            topString, 
+        let gameDisplayString = prepareMessage(
             `\nDifficulty: ${difficulty} | Total Mines: ${mines} | Mines Left: ${mines - flagsAmount}`,
-            getGridTile
+            getGridTile,
         )
 
         const message = await interaction.reply({
@@ -363,7 +414,7 @@ module.exports = {
                 if (firstGuess) {
                     firstGuess = false;
                     //Generate the board. If a bad mine is placed, try again
-                    //Should be fine to repeat a few times, since the maximum concentration is 40%
+                    //Should be fine to repeat a few times, since the maximum concentration is 33%
                     for (let i = 0; i < mines; i++) {
                         const mineX = Math.floor(Math.random() * width);
                         const mineY = Math.floor(Math.random() * height);
@@ -396,58 +447,34 @@ module.exports = {
                     safeSurroundings(visibleField, y, x, (i, j) => {
                         if (!visibleField[i][j]) dig(i, j);
                     })
-                }
-                
+                } 
+            }
+            if (squaresDug === height * width - mines) {
+                //win
+                const msTime = Date.now() - initialClickTime;
+                endGame(`\nDifficulty: ${difficulty} | ${mines} mines complete in ${msTime/1000} seconds!`);
+                if (difficulty === "Custom") return;
+                minesweeperGame.create({
+                    userInfoUserId: userId,
+                    serverInfoServerId: interaction?.guild?.id || globalAndTestGuildId,
+                    difficulty: difficulty,
+                    time: msTime,
+                });
             }
 
-            gameDisplayString = prepareMessage(field, 
-                visibleField, 
-                topString,
+            //Check if user was removed from playerData via the endGame function
+            if (!playerData[userId]) return
+
+            gameDisplayString = prepareMessage(
                 `\nDifficulty: ${difficulty} |` 
                 + `Total Mines: ${mines} | `
                 + `Mines Left: ${mines-flagsAmount} | `
                 + `Time: ${(Date.now() - initialClickTime)/1000}s`,
-                getGridTile
+                getGridTile,
             )
 
             delete playerInfo.x;
             delete playerInfo.y;
-            if (gameOver) {
-                if (winState) {
-                    const msTime = Date.now() - initialClickTime;
-                    endGame(`\nDifficulty: ${difficulty} | ${mines} mines complete in ${msTime/1000} seconds!`);
-                    if (difficulty === "Custom") return;
-                    minesweeperGame.create({
-                        userInfoUserId: userId,
-                        serverInfoServerId: interaction?.guild?.id || globalAndTestGuildId,
-                        difficulty: difficulty,
-                        time: msTime,
-                    });
-                } else {
-                    let correctFlags = 0;
-                    let incorrectFlags = 0;
-                    for (let i = 0; i < visibleField.length; i++) {
-                        for (let j = 0; j < visibleField[i].length; j++) {
-                            if (visibleField[i][j] === "flag" && field[i][j] === 9) {
-                                correctFlags++;
-                            } else if (visibleField[i][j] === "flag") {
-                                incorrectFlags++;
-                            }
-                        }
-                    }
-    
-                    endGame(
-                        `Better luck next time!`
-                        + `\nDifficulty: ${difficulty} | `
-                        + `Spaces Dug: ${squaresDug} | ` 
-                        + `Time: ${(Date.now()-initialClickTime)/1000} | `
-                        + `Correct Flags: ${correctFlags} | `
-                        + `Incorrect Flags: ${incorrectFlags}`
-                    );
-                    return;
-                }
-            }
-            
 
             playerData[userId] = playerInfo;
 
@@ -455,10 +482,11 @@ module.exports = {
                 {content: gameDisplayString, components: rows}
             );
         }
-        
 
         const filter = m => m.author.id === userId && m.content.length <= 3;//A letter and two digits
-        playerData[userId].messageCollector = interaction.channel.createMessageCollector({filter, time: 14.5*60_000});
+        playerData[userId].messageCollector = interaction.channel.createMessageCollector(
+            {filter, time: timeLimit} //The bot is unable to edit its message after 15 minutes. 
+        );
         playerData[userId].messageCollector.on('collect', msg => {
             //figure out x and y based on text input
             const content = msg.content.toUpperCase();
@@ -491,13 +519,18 @@ module.exports = {
             playerInfo.x = parseInt(playerInfo.x);
             inputFunction(playerInfo);
         });
-        
-
-        setTimeout(function() {
-            if (!playerData[userId].gameEnd) {
-                endGame("Game timeout! This should only happen after fourteen and a half minutes.");
-            }
-        }, 14.5*60_000)
+        playerData[userId].messageCollector.on('end', (_collected, reason) => {
+            if (reason === "game end") return;
+            //May need another gate condition
+            endGame(
+            `\nGame ended due to ${reason}.`
+            + `\nDifficulty: ${difficulty} | `
+            + `Spaces Dug: ${squaresDug ?? 0} | ` 
+            + `Time: ${(Date.now()-initialClickTime)/1000} | `
+            + `Correct Flags: ${correctFlags ?? 0} | `
+            + `Incorrect Flags: ${incorrectFlags ?? 0}`
+            );
+        });
 
         if (!includeButtons) return;
         //wait a second i really only need this for the buttons... otherwise... yeah...
@@ -526,7 +559,7 @@ module.exports = {
             return playerInfo
         }
         playerData[userId].buttonCollector = message.createMessageComponentCollector(
-            { componentType: ComponentType.Button, time: 14.5*60_000 }
+            { componentType: ComponentType.Button, time: timeLimit }
         );
         playerData[userId].buttonCollector.on('collect', i => {
             if (i.user.id === userId) {
