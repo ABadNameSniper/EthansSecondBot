@@ -25,8 +25,6 @@ decide on "hyperchats" or "hyperchannels" maybe. It's a weird mix of both right 
 
 /flipbook new/edit/delete/editSettings command and subcommand!! that would be fun
 
-rewrite editing system so that it caches sent message ids (send.then(;alskdjf;asf))
-
 convert everything into ES modules instead of CJS
 
 replace discord-tts with a better solution using just the normal google-tts-api

@@ -52,9 +52,7 @@ module.exports = {
         .addSubcommand(subcommand => 
             subcommand.setName('add')
             .setDescription('Let a broadcasted messages relay to here. It\'s like server announcements.')
-            .addStringOption(option =>
-                makeCategoriesOption(option)
-            )
+            .addStringOption(makeCategoriesOption)
             .addChannelOption(option =>
                 option.setName('channel')
                 .setDescription('Which channel will broadcasted messages go to?')
@@ -64,9 +62,7 @@ module.exports = {
         .addSubcommand(subcommand => 
             subcommand.setName('transmit')
             .setDescription('Send a message.')
-            .addStringOption(option =>
-                makeCategoriesOption(option)//remove all?
-            )
+            .addStringOption(makeCategoriesOption)
             .addStringOption(option =>
                 option.setName('message')
                 .setDescription('The... message. You know, the one you  want to send?')
@@ -80,9 +76,7 @@ module.exports = {
         .addSubcommand(subcommand => 
             subcommand.setName('remove')
             .setDescription('Removes a channel\'s "listening" ability. No more broadcasts there.')
-            .addStringOption(option =>
-                makeCategoriesOption(option)
-            )
+            .addStringOption(makeCategoriesOption)
             .addChannelOption(option =>
                 option.setName('channel')
                 .setDescription('Was it the spam? It was the spam, wasn\'t it?')
@@ -121,6 +115,10 @@ module.exports = {
                 }
                 break;
             case 'transmit':
+                if (!permissionHierarchy.broadcasts[category]) {
+                    interaction.reply({content: "Unrecognized category! This is awkward.", ephemeral: true});
+                    return;
+                }
                 if (!(
                     admins.includes(interaction.user.id) ||
                     permissionHierarchy.broadcasts[category].includes(interaction.user.id)
@@ -140,7 +138,10 @@ module.exports = {
                             .then((channel) => {
                                 require('../utils/resolvename')(interaction.user, interaction.member, false, "ymous")
                                 .then(({displayName}) => {
-                                    channel.send(`[${category}] ${displayName}: ${message}`);
+                                    channel.send({
+                                        content: `[${category}] ${displayName}: ${message}`,
+                                        allowedMentions: {parse: []}
+                                    })
                                 })
                         })
                         } catch {

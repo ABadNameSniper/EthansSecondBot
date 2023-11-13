@@ -325,10 +325,7 @@ module.exports = {
 				iconURL: avatarURL
 			})
 
-			//Clean the message!
-			//TODO: do this with @ing roles and users too.
-			let content = msg.content.replace("@everyone", "@ everyone").replace("@here", "@ here") || '';//certified js moment
-
+			let content = msg.content
 			const urls = [];
 			msg.attachments.forEach(attachment => {
 				content += ` [${attachment.contentType} attachment]`; //show type later
@@ -392,7 +389,8 @@ module.exports = {
 						lastMessage.edit({
 							embeds: [
 								embed
-							]
+							],
+							allowedMentions: {parse: []}
 						}).then(msg => hyperMessage.push(msg));
 
 						console.log(performance.now() - t0);
@@ -405,7 +403,8 @@ module.exports = {
 
 				console.log(performance.now() - t0);
 				currentChannel.send({
-					embeds: [embed]
+					embeds: [embed],
+					allowedMentions: {parse: []}
 				}).then(msg => hyperMessage.push(msg));
 				if (urls.length) currentChannel.send(urls.join("\n"));
 			}));
