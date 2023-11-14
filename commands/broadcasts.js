@@ -8,7 +8,7 @@ const sequelize = new Sequelize(database, user, password, options);
 const databaseModels = require(indexRoot+'/utils/databaseModels.js');
 const listeningChannel = databaseModels.listeningChannel(sequelize, Sequelize.DataTypes)
 listeningChannel.sync();
-const broadcastCategories = Object.keys(permissionHierarchy.broadcasts);//integrate into SlashCommandBulder pls todo to do
+const broadcastCategories = Object.keys(permissionHierarchy.broadcasts);
 const allbroadcasters = [];
 for (const category of broadcastCategories) {
     allbroadcasters.concat(permissionHierarchy.broadcasts[category]);//who cares about repeats?

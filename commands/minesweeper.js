@@ -24,29 +24,12 @@ minesweeperGame.belongsTo(serverInfo, {
 })
 minesweeperGame.sync();
 
-var playerData = {
-    /*
-    '135904873923832': {
-        x: int,
-        y: int,
-        lastXButton: String,
-        lastYButton: String
-    }
-    */
-}
+var playerData = {};
 
 const explosion = "💥";
 const bomb = "💣";
 const numberEmojis = ["🟦", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟", "‼"];
-const maximumLength = 
-    Math.floor(//Get a nice round number in case the other values are tweaked
-        Math.sqrt(( //Arranged in a square
-                2000      //Max amount of characters in a message
-            - 125       //A little more than the amount of characters a lost game over message would be.
-        )/2.89      //worst case scenario, for keycap emoji to bomb ratio
-        )-2       //Remove the borders
-    ) //23
-    + 1; //Just kidding there's one more space since the borders use up less characters than the playing space would
+const maximumLength = 26;
 const maximumDensity = 0.25;
 const maximumMines = Math.floor(maximumLength ** 2 * maximumDensity);
 const largeModeThreshold = 199;//Discord does not display 200 or more emojis in a single message.
@@ -70,7 +53,7 @@ const formats = {
         topString : [
             bomb, ...[...Array(maximumLength).keys()].map((n) =>
                 n + " ".repeat(n % 2 + (n < 10))//Have to deal with weird spacing in codeblocks!
-            ), bomb, "\n"
+            ), bomb
         ],
         flag: "⛳"
     }
@@ -195,12 +178,13 @@ module.exports = {
         }
 
         playerData[userId] = {};
+        const player = playerData[userId]
 
         const endGame = function(additionalMessage) {
-            playerData[userId]?.buttonCollector?.stop("game end");
-            playerData[userId].messageCollector.stop("game end");
+            player?.buttonCollector?.stop("game end");
+            player.messageCollector.stop("game end");
 
-            gameDisplayString = prepareMessage(additionalMessage, (i, j) => {
+            gameDisplayString = prepareMessage((i, j) => {
                 return field[i][j] === 9
                     ? visibleField[i][j] === true //Explicit true, to exclude flags
                         ? explosion
@@ -213,25 +197,31 @@ module.exports = {
                     component.setDisabled(true);
                 }
             }
-            interaction.editReply(
-                {content: gameDisplayString, components: rows}
-            );
+            interaction.editReply(gameDisplayString);
+
+            statsMessage.edit({
+                content: additionalMessage,
+                components: rows
+            })
 
             delete playerData[userId];
         }
 
-        const prepareMessage = function(additionalMessage, updateGridString) {
-            let gameDisplayString = (largeMode && "```\n" || "") + topStringFit;
+        const prepareMessage = function(updateGridString) {
+            let gameDisplayString = (largeMode && "```" || "") + topStringFit;
             for (let i = 0; i < visibleField.length; i++) {
                 gameDisplayString += 
                     letterChars.substring(i*2, i*2 + 2);
                 for (let j = 0; j < visibleField[i].length; j++) {
-                    gameDisplayString += updateGridString(i, j, field, visibleField, );
+                    gameDisplayString += updateGridString(i, j);
                 }
-                gameDisplayString += 
-                    letterChars.substring(i*2, i*2 + 2) + "\n";
+                gameDisplayString += //Trim to save an extra character for later.
+                    letterChars.substring(i*2, i*2 + 2).trim() + "\n";
             }
-            return gameDisplayString + topStringFit + (largeMode && "```\n" || "") + additionalMessage;
+            gameDisplayString += topStringFit + (largeMode && "```\n" || "");
+            //Cut off the last little bit, since in 25x25 and larger games the grid can exceed 2k characters.
+            if (gameDisplayString.length > 2000) gameDisplayString = gameDisplayString.slice(0, 1997) + "```";
+            return gameDisplayString;
         }
 
         const getGridTile = function(i, j) {
@@ -295,16 +285,16 @@ module.exports = {
             )
             let i = 1;
 
-            for (i; i-1 < width; i++) {
+            for (i; i - 1 < width; i++) {
                 currentMAR.addComponents(
                     new ButtonBuilder()
-                    .setCustomId((i-1).toString())
-                    .setLabel((i-1).toString())
+                    .setCustomId((i - 1).toString())
+                    .setLabel((i - 1).toString())
                     .setStyle(ButtonStyle.Secondary)
                 );
-                if ((i+1) % 5 === 0) {
-                    rows.push(currentMAR)
-                    currentMAR = new ActionRowBuilder()
+                if ((i + 1) % 5 === 0) {
+                    rows.push(currentMAR);
+                    currentMAR = new ActionRowBuilder();
                 }
             }
             for (i; i < height + width + 1; i++) {
@@ -315,8 +305,8 @@ module.exports = {
                     .setStyle(ButtonStyle.Primary)
                 );
                 if ((i + 1) % 5 === 0 || i === height + width) {
-                    rows.push(currentMAR)
-                    currentMAR = new ActionRowBuilder()
+                    rows.push(currentMAR);
+                    currentMAR = new ActionRowBuilder();
                 }
             }
         }
@@ -370,37 +360,31 @@ module.exports = {
             }
         }
 
-        let gameDisplayString = prepareMessage(
-            `\nDifficulty: ${difficulty} | Total Mines: ${mines} | Mines Left: ${mines - flagsAmount}`,
-            getGridTile,
-        )
+        let gameDisplayString = prepareMessage(getGridTile);
 
-        const message = await interaction.reply({
-            content: gameDisplayString,
+        await interaction.reply(gameDisplayString);
+
+        const statsMessage = await interaction.channel.send({
+            content: `\nDifficulty: ${difficulty} | Total Mines: ${mines} | Mines Left: ${mines - flagsAmount}`,
             components: rows,
             fetchReply: true
         })
+
+        const updateStatsMessage = function() {
+            return `\nDifficulty: ${difficulty} |` 
+                + `Total Mines: ${mines} | `
+                + `Mines Left: ${mines-flagsAmount} | `
+                + `Time: ${(Date.now() - initialClickTime)/1000}s`
+        }
         
         let initialClickTime;
         let firstGuess = true;
-        const inputFunction = function(playerInfo) {
-            const { x, y, flagging} = playerInfo
-
-            if (
-                x == null || y == null || //Check if nullish
-                isNaN(x) || isNaN(y) || //Check if not a number
-                x < 0 || y < 0 || x >= width || y >= height //check if out of bounds
-            ) return;
-
-            searchAndSetStyle(playerInfo.lastYButton, ButtonStyle.Primary, rows);
-            searchAndSetStyle(playerInfo.lastXButton, ButtonStyle.Secondary, rows);
-            
-            delete playerInfo.lastXButton;
-            delete playerInfo.lastYButton;
+        const inputFunction = function() {
+            const { x, y } = player;
 
             initialClickTime ??= Date.now();
 
-            if (flagging) {
+            if (player.flagging) {
                 //flagging and unflagging
                 if (!visibleField[y][x]) {
                     visibleField[y][x] = "flag";
@@ -465,63 +449,58 @@ module.exports = {
             //Check if user was removed from playerData via the endGame function
             if (!playerData[userId]) return
 
-            gameDisplayString = prepareMessage(
-                `\nDifficulty: ${difficulty} |` 
-                + `Total Mines: ${mines} | `
-                + `Mines Left: ${mines-flagsAmount} | `
-                + `Time: ${(Date.now() - initialClickTime)/1000}s`,
-                getGridTile,
-            )
+            gameDisplayString = prepareMessage(getGridTile);
 
-            delete playerInfo.x;
-            delete playerInfo.y;
+            delete player.x;
+            delete player.y;
+            player.flagging = false;
 
-            playerData[userId] = playerInfo;
+            interaction.editReply(gameDisplayString);
 
-            interaction.editReply(
-                {content: gameDisplayString, components: rows}
-            );
+            statsMessage.edit({
+                content: updateStatsMessage(),
+                components: rows
+            });
         }
 
-        const filter = m => m.author.id === userId && m.content.length <= 3;//A letter and two digits
-        playerData[userId].messageCollector = interaction.channel.createMessageCollector(
-            {filter, time: timeLimit} //The bot is unable to edit its message after 15 minutes. 
-        );
-        playerData[userId].messageCollector.on('collect', msg => {
-            //figure out x and y based on text input
+        player.messageCollector = interaction.channel.createMessageCollector({
+            filter: m => 
+                m.author.id === userId
+                && m.content.length
+                && m.content.length <= 3 , 
+            time: timeLimit
+        });
+        
+        player.messageCollector.on('collect', msg => {
+            //this is written assuming a height of 26 for 26 letters.
             const content = msg.content.toUpperCase();
-            if (!content) return;
-            if (msg.deletable) msg.delete();
-            let playerInfo = playerData[userId];
-            if (content === "F") {
-                playerInfo.flagging = !playerInfo.flagging;
-                if (includeButtons) buttonSelect(playerInfo, "flag");
-                return;
-            }
-            const first = content[0];
-            const second = content[1];
-            const third = content[2];
-            playerInfo.x = "";
-            playerInfo.y = first.charCodeAt(0) - 65;
-            if (!isNaN(first)) {//if it's a number
-                playerInfo.x = first;
-            }
-            if (!isNaN(second)) {
-                playerInfo.x = playerInfo.x + second.toString();
-                if (!isNaN(third)) {
-                    playerInfo.x = playerInfo.x + third.toString();
-                } else if (third) {
-                    playerInfo.y = third.charCodeAt(0) - 65;
+            const numbers = content.match(/\d{1,2}/g);
+            if (!numbers.length || numbers.length > 1) return;
+            player.x = parseInt(numbers[0]);
+            const letters = content.match(/[A-Z]/g);
+            if (!letters.length || letters.length > 2) return;
+            if (letters.length > 1) {
+                player.flagging = true;
+                if (letters[0] === "F") {
+                    //Flag
+                    player.y = letters[1].charCodeAt(0) - 65;
+                } else if (letters[1] === "F") {
+                    //Flag
+                    player.y = letters[0].charCodeAt(0) - 65;
+                } else {
+                    //Invalid with 26 letters
+                    player.flagging = false;
+                    return;
                 }
-            } else if (second) {//single digit, assume letter
-                playerInfo.y = second.charCodeAt(0) - 65;
+            } else {
+                player.y = letters[0].charCodeAt(0) - 65;
             }
-            playerInfo.x = parseInt(playerInfo.x);
-            inputFunction(playerInfo);
+            if (x >= width || y >= height) return;
+            if (msg.deletable) msg.delete();
+            inputFunction();
         });
         playerData[userId].messageCollector.on('end', (_collected, reason) => {
             if (reason === "game end") return;
-            //May need another gate condition
             endGame(
             `\nGame ended due to ${reason}.`
             + `\nDifficulty: ${difficulty} | `
@@ -535,39 +514,42 @@ module.exports = {
         if (!includeButtons) return;
         //wait a second i really only need this for the buttons... otherwise... yeah...
 
-        //TODO: change this into more of a display type thing.
-        const buttonSelect = function(playerInfo, buttonId) {
-            if (buttonId === 'flag') {
-                searchAndSetStyle(
-                    'flag',
-                    ButtonStyle.Success,
-                    rows,
-                    ButtonStyle.Danger
-                )
-                //playerInfo.flagging = !playerInfo.flagging;
-            } else if (isNaN(parseInt(buttonId))) {
-                searchAndSetStyle(playerInfo.lastYButton, ButtonStyle.Primary, rows);//maybe a good idea for if statement
-                searchAndSetStyle(buttonId, ButtonStyle.Success, rows);
-                playerInfo.y = buttonId.charCodeAt(0) - 65;
-                playerInfo.lastYButton = buttonId;
-            } else {
-                searchAndSetStyle(playerInfo.lastXButton, ButtonStyle.Secondary, rows)
-                searchAndSetStyle(buttonId, ButtonStyle.Success, rows);
-                playerInfo.x = parseInt(buttonId);
-                playerInfo.lastXButton = buttonId;
-            }
-            return playerInfo
-        }
-        playerData[userId].buttonCollector = message.createMessageComponentCollector(
+        playerData[userId].buttonCollector = statsMessage.createMessageComponentCollector(
             { componentType: ComponentType.Button, time: timeLimit }
         );
         playerData[userId].buttonCollector.on('collect', i => {
             if (i.user.id === userId) {
                 i.deferUpdate();
+                const buttonId = i.customId;
+                if (buttonId === "flag") {
+                    player.flagging = !player.flagging;
+                    searchAndSetStyle("flag", ButtonStyle.Success, rows, ButtonStyle.Danger);
+                } else if (isNaN(parseInt(buttonId))) {//If it's a letter
+                    searchAndSetStyle(player.lastYButton, ButtonStyle.Primary, rows);//maybe a good idea for if statement
+                    searchAndSetStyle(buttonId, ButtonStyle.Success, rows);
+                    player.y = buttonId.charCodeAt(0) - 65;
+                    player.lastYButton = buttonId;
+                } else {
+                    searchAndSetStyle(player.lastXButton, ButtonStyle.Secondary, rows);
+                    searchAndSetStyle(buttonId, ButtonStyle.Success, rows);
+                    player.x = parseInt(buttonId);
+                    player.lastXButton = buttonId;
+                }
+                if (player.lastXButton && player.lastYButton) {
+                    searchAndSetStyle(player.lastYButton, ButtonStyle.Primary, rows);
+                    searchAndSetStyle(player.lastXButton, ButtonStyle.Secondary, rows);
+                    searchAndSetStyle("flag", ButtonStyle.Danger, rows)
 
-                let playerInfo = playerData[userId];//not sure if i like this system
-                buttonSelect(playerInfo, i.customId);//.data?
-                inputFunction(playerInfo);
+                    delete player.lastXButton
+                    delete player.lastYButton
+
+                    inputFunction();
+                } else {
+                    statsMessage.edit({
+                        content: updateStatsMessage(),
+                        components: rows
+                    })
+                }
             } else {
                 i.reply({ content: `These buttons aren't for you!`, ephemeral: true });
             }
