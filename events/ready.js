@@ -1,8 +1,7 @@
 const fs = require('fs');
+const path = require('path');
 const { ActivityType } = require("discord.js");
-const indexRoot = process.cwd();
-const updateCommands = require(`${indexRoot}/utils/updateCommands.js`);
-const commandsFolderPath = indexRoot+'/commands';
+const commandsFolderPath = path.resolve(__dirname, '../commands');
 const globalCommands = [];
 const guildCommands = [];
 
@@ -23,33 +22,6 @@ module.exports = {
 	name: 'ready',
 	once: true,
 	async execute(client) {
-
-        //TODO: remove these comments I guess. I don't think updating commands should require a restart of the bot.
-
-        //Update everything?
-        // if (true) {
-        //     await updateCommands.updateGuildCommands(client);
-        //     console.log("epic");
-        //     // await updateCommands.updateGuildCommandPermissions(client);
-        //     // console.log('epic 2');
-        // }
-
-        // if (true) {
-        //     await updateCommands.updateGuildCommands(client, guildId);
-        //     console.log("epic");
-        //     await updateCommands.updateGuildCommandPermissions(client, guildId);
-        //     console.log('epic 2');
-        // }
-
-        // if (true) {
-        //     await updateCommands.updateGuildCommands(client);
-        //     console.log("epic");
-        //     // await updateCommands.updateGuildCommandPermissions(client, undefined, "");
-        //     // console.log('epic 2');
-        // }
-        // updateCommands.updateApplicationCommands(client);
-
-
         const rdmNumber = [Math.floor(Math.random() * startingStatusArray.length)];
         client.user.setActivity(startingStatusArray[rdmNumber], {type: startingStatusArrayType[rdmNumber]});
 

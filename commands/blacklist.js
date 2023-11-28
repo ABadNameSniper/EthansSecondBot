@@ -1,23 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const indexRoot = process.cwd()
-const { globalAndTestGuildId, permissionHierarchy, database, user, password, options } = require(indexRoot+'/config.json');
-const admins = permissionHierarchy.admins;
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require(indexRoot+'/utils/databaseModels.js')
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes);
-const serverInfo = databaseModels.serverInfo(sequelize, Sequelize.DataTypes);
-const blacklistItem = databaseModels.blacklistItem(sequelize, Sequelize.DataTypes);
-
-
-userInfo.hasMany(blacklistItem, {sourceKey: 'userId'/*, foreignKey: 'id'*/});
-serverInfo.hasMany(blacklistItem, {sourceKey: 'serverId'});
-
-
-//before or after defining associations??
-userInfo.sync();
-blacklistItem.sync({force: false})
-
+const { globalAndTestGuildId, admins } = require('../config.json');
+const { blacklistItem } = require('../models');
+const savedUser = require('../models/savedUser.model');
 
 module.exports = {
     guildCommand: true,
@@ -50,29 +34,43 @@ module.exports = {
             || interaction.guild.ownerId === interaction.user.id
         )) return;
 
-
-        const userId = interaction.options.getUser('user').id;
+        const user = interaction.options.getUser('user');
+        if (user.bot) {
+            interaction.reply("There's no need to blacklist bots!");
+            return;
+        }
+        const userId = user.id;
+        await savedUser.findOrCreate({where: {userId}})
         const severity = Math.max(Math.min(interaction.options.getInteger('severity'), 4), 1)   || 1;
         const remove = interaction.options.getBoolean('remove')                                 || false;
         const global = interaction.options.getBoolean('global')                                 || false;
         if (!remove) {
             await blacklistItem.create({
-                userInfoUserId: userId,
-                serverInfoServerId: (global && admins.includes(interaction.user.id) )
+                userId,
+                guildId: (global && admins.includes(interaction.user.id) )
                     ? globalAndTestGuildId
                     : interaction.guild.id,
                 severity: severity
             })
 
-            interaction.reply(`<@${userId}> blacklisted from ${global ? "everywhere" : "this server"} at severity level ${severity}.`);
+            interaction.reply({
+                content: `<@${userId}> blacklisted from ${global ? "everywhere" : "this server"} at severity level ${severity}.`,
+                allowedMentions: {parse: []}
+            });
         } else {
             if (global && admins.includes(interaction.user.id)) {
-                blacklistItem.destroy({where: {serverInfoServerId: globalAndTestGuildId}}).then(
-                    interaction.reply(`<@${userId}> removed from the global blacklist`)
+                blacklistItem.destroy({where: {guildId: globalAndTestGuildId}}).then(
+                    interaction.reply({
+                        content: `<@${userId}> removed from the global blacklist`,
+                        allowedMentions: {parse: []}
+                    })
                 )
             } else {
-                blacklistItem.destroy({where: {serverInfoServerId: interaction.guild.id}}).then(
-                    interaction.reply(`<@${userId}> removed from the server blacklist`)
+                blacklistItem.destroy({where: {guildId: interaction.guild.id}}).then(
+                    interaction.reply({
+                        content: `<@${userId}> removed from the server blacklist`,
+                        allowedMentions: {parse: []}
+                    })
                 )
             }
         }

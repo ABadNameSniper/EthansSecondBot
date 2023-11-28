@@ -1,21 +1,16 @@
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus } = require("@discordjs/voice");
-const indexRoot = process.cwd()
-const { database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require('../utils/databaseModels');
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes);
-userInfo.sync();
+const path = require('path')
+const { savedUser } = require('../models');
 
 module.exports = {
 	name: 'voiceStateUpdate',
-	async execute(oldState, newState, client) {
+	async execute(oldState, newState) {
         const user = newState.member.user;
-        if(newState.channelId!==oldState.channelId && !user.bot) {
+        if(newState.channelId !== oldState.channelId && !user.bot) {
             const voiceChannel = newState.channel;
             if (voiceChannel) {
-                const currentUserInfo = await databaseModels.userInfoDefault(userInfo, user.id);
-                const audioFileName = currentUserInfo.get("introSelected");
+                const [currentUser] = await savedUser.findOrCreate({where: {userId: user.id}});
+                const audioFileName = currentUser.introSelected;
                 if (!audioFileName || audioFileName === "none") return;
 
                 const connection = joinVoiceChannel({
@@ -24,8 +19,11 @@ module.exports = {
                     adapterCreator: newState.guild.voiceAdapterCreator
                 });
                 const player = createAudioPlayer();
-                const resource = createAudioResource(indexRoot+'/assets/audio/intros/'+audioFileName, {inlineVolume: true});
-                resource.volume.setVolume(0.05);
+                const resource = createAudioResource(
+                    path.join(path.resolve(__dirname, '../assets/audio/intros'), audioFileName), 
+                    {inlineVolume: true}
+                );
+                resource.volume.setVolume(0.25);
                 connection.on(VoiceConnectionStatus.Ready, () => {
                     connection.subscribe(player);
                     player.play(resource);

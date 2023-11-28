@@ -36,7 +36,7 @@ module.exports = {
             vcObj[voiceChannelId].msgCollector.stop();
             return;
         }
-        interaction.reply("Success! After 10 minutes of no one talking, you'll need to use the command again if you want to continue using text-to-VC.")
+        interaction.reply("Success! After 5 minutes of not talking, you'll need to use the command again if you want to continue using text-to-VC.")
         vcObj[voiceChannelId] = {
             connection: joinVoiceChannel({
                 channelId: voiceChannelId,
@@ -47,8 +47,8 @@ module.exports = {
 
         vcObj[voiceChannelId].player = createAudioPlayer();
         const player = vcObj[voiceChannelId].player
-        const subscription = vcObj[voiceChannelId].connection.subscribe(player);
-        vcObj[voiceChannelId].msgCollector = textChannel.createMessageCollector({idle: 60_000*10});
+        vcObj[voiceChannelId].connection.subscribe(player);
+        vcObj[voiceChannelId].msgCollector = textChannel.createMessageCollector({idle: 60_000*5});
         const msgCollector = vcObj[voiceChannelId].msgCollector;
 
         let msgQueue = [];
@@ -89,7 +89,6 @@ module.exports = {
                     )
                     .match(/.{1,200}/g)
                     .map(substring => {
-                        console.log("Substring:" + substring + ":endSubstring")
                         return createAudioResource(discordTTS.getVoiceStream(substring));
                     })
                     .values()

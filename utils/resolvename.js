@@ -1,16 +1,9 @@
-const indexRoot = process.cwd()
-const { database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-
-const databaseModels = require('./databaseModels');
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes)
-
-
+const { savedUser } = require('../models');
 
 module.exports = async function(user, member, anonSuffix = '', embedColor = "#000000") {
     //future self: see if there's any way to get settings column all by itself
-    const anonymizeTag = (await databaseModels.userInfoDefault(userInfo, (user || member).id)).get("settings").anonymizeTag;
+    const [currentUser] = await savedUser.findOrCreate({where: {userId: user.id}})
+    const anonymizeTag = currentUser.settings.anonymizeTag;
 
     let displayName;
     let avatarURL;

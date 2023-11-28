@@ -2,6 +2,7 @@
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
 const fs = require('fs');
 const { token } = require('./config.json');
+const syncDB = require("./utils/syncDB.js");
 
 // Create a new client instance
 const client = new Client(
@@ -16,7 +17,6 @@ const client = new Client(
 			GatewayIntentBits.MessageContent,
 
 			GatewayIntentBits.DirectMessages,
-			//GatewayIntentBits.
 		], 
 		partials: [Partials.Channel, Partials.Message, Partials.Reaction]
 	}
@@ -41,6 +41,7 @@ for (const file of eventFiles) {
 		client.on(event.name, (...args) => event.execute(...args, client));
 	}
 }
-
+syncDB.updateAllDB().then(() => {
+	client.login(token);
+})
 // Login to Discord with your client's token
-client.login(token);

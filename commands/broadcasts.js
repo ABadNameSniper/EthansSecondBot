@@ -1,33 +1,29 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { ChannelType, PermissionFlagsBits } = require('discord.js');
-const indexRoot = process.cwd()
-const { permissionHierarchy, database, user, password, options } = require(indexRoot+'/config.json');
-const admins = permissionHierarchy.admins;
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require(indexRoot+'/utils/databaseModels.js');
-const listeningChannel = databaseModels.listeningChannel(sequelize, Sequelize.DataTypes)
-listeningChannel.sync();
-const broadcastCategories = Object.keys(permissionHierarchy.broadcasts);
-const allbroadcasters = [];
-for (const category of broadcastCategories) {
-    allbroadcasters.concat(permissionHierarchy.broadcasts[category]);//who cares about repeats?
-}
+const { PermissionFlagsBits } = require('discord.js');
+const { broadcastCategories } = require('../config.json');
+const { broadcastChannel } = require('../models');
 
-const addNewChannel = async function(listeningChannel, channelId, category) {
-    //check if it exists first
-    if (
-        await listeningChannel.findOne({
-            where: {
-                channelId: channelId,
-                category: category
-            }
-        })
-    ) return;
-    listeningChannel.create({
-        channelId: channelId,
-        category: category
+const addNewChannel = async function(userId, categoryName, channelId) {
+    const [newChannel] = await broadcastChannel.findOrCreate({
+        where: {
+            userId,
+            categoryName
+        },
+        defaults: {
+            userId,
+            categoryName,
+        }
     })
+    console.log(newChannel);
+    console.log(newChannel.listenerIds);
+    if (newChannel.listenerIds.includes(channelId)) {
+        return true;
+    } else {
+        newChannel.listenerIds = [...newChannel.listenerIds, channelId];
+        await newChannel.save();
+    }
+    console.log(newChannel);
+    console.log(newChannel.listenerIds);
 }
 
 const makeCategoriesOption = function(option) {
@@ -37,18 +33,15 @@ const makeCategoriesOption = function(option) {
     for (const category of broadcastCategories) {
         option.addChoices({name: category, value: category});
     }
-    return option.addChoices({name: "All", value: "All"});
+    return option;
 }
 
 module.exports = {
     guildCommand: true,
-    permittedUserIds: allbroadcasters,
+    severityThreshold: 2,
 	data: new SlashCommandBuilder()
-        .setName('broadcasts')//many shared options, could be collapsed into one single command with stringoption action
+        .setName('broadcasts')
 		.setDescription('Everything broadcasts.')
-        //.setDefaultPermission(false)
-        //.setDefaultMemberPermissions('0')
-        //SUBCOMMANDS "INHERIT" command permissions 
         .addSubcommand(subcommand => 
             subcommand.setName('add')
             .setDescription('Let a broadcasted messages relay to here. It\'s like server announcements.')
@@ -66,7 +59,6 @@ module.exports = {
             .addStringOption(option =>
                 option.setName('message')
                 .setDescription('The... message. You know, the one you  want to send?')
-                .setRequired(true)
             )
             .addAttachmentOption(option => 
                 option.setName('media')
@@ -75,99 +67,105 @@ module.exports = {
         )
         .addSubcommand(subcommand => 
             subcommand.setName('remove')
-            .setDescription('Removes a channel\'s "listening" ability. No more broadcasts there.')
+            .setDescription('Removes the "listener" from the channel.')
             .addStringOption(makeCategoriesOption)
             .addChannelOption(option =>
                 option.setName('channel')
-                .setDescription('Was it the spam? It was the spam, wasn\'t it?')
+                .setDescription('Which text channel to remove it from.')
                 .setRequired(true)
             )
         ),
     execute(interaction) {
-        //checks here
-
         const client = interaction.client;
-        const clientUserId = client.user.id;
         const channel = interaction.options.getChannel('channel');
         const channelId = channel?.id;
         const category = interaction.options.getString('category');
+        const user = interaction.user
+        const userId = user.id;
         
-        if (channel && channel.type!==ChannelType.GuildText) {
+        if (
+            interaction.options.getSubcommand() !== "transmit" 
+            && !channel?.isTextBased()
+        ) {
             interaction.reply("You have to select a text channel!");
             return;
         }
         switch(interaction.options.getSubcommand()) {
             case 'add':
-                let footnote = "";
-                
-                if (!channel.permissionsFor(clientUserId)?.has(PermissionFlagsBits.SendMessages)) {
-                    footnote += "\rNote: ESB does not currently have permission to send a message to that channel. " 
-                    + "Broadcasts will not be recieved until that is changed.";
-                }
-                interaction.reply("Adding *" + category + "* reciever to <#" + channel.id + ">. "+footnote)
-
-                if (category!=="All") {
-                    addNewChannel(listeningChannel, channelId, category);
+                const guild = interaction.guild;
+                //permissionsFor wouldn't work for whatever reason
+                if (!guild.members.me?.permissionsIn(channel)?.has(PermissionFlagsBits.SendMessages)) {
+                    interaction.reply("Assignment failed! ESB doesn't have permission to send messages in that channel.");
                     return;
                 }
-                for (const category of broadcastCategories) {
-                    addNewChannel(listeningChannel, channelId, category);
+                if (!channel.permissionsFor(user)?.has(PermissionFlagsBits.SendMessages)) {
+                    interaction.reply("Assignment failed! You don't have permission to send messages in that channel.");
+                    return;
+                }
+
+                if (addNewChannel(userId, category, channelId)){
+                    interaction.reply(`Adding *${category}* reciever to <#${channelId}>.`);
+                } else {
+                    interaction.reply("The selected channel is already listening to that category!");
                 }
                 break;
             case 'transmit':
-                if (!permissionHierarchy.broadcasts[category]) {
+                if (!broadcastCategories.includes(category)) {
                     interaction.reply({content: "Unrecognized category! This is awkward.", ephemeral: true});
                     return;
                 }
-                if (!(
-                    admins.includes(interaction.user.id) ||
-                    permissionHierarchy.broadcasts[category].includes(interaction.user.id)
-                )) {
-                    interaction.reply({content: "You're not permitted to broadcast!", ephemeral: true});
-                    return;
-                } 
-                interaction.reply("Sending message");
                 let message = interaction.options.getString('message');
-                console.log("Broadcasting message:", message);
                 const attachment = interaction.options.getAttachment('media');
-                message = message + "\n" + (attachment?.url || '')
-                listeningChannel.findAll({where:{category: category}}).then(results => {
-                    for (const listeningChannelItem of results) {
+                if (!message && !attachment) {
+                    interaction.reply("Well you have to send *something*!");
+                    return;
+                }
+                message = message + "\n" + (attachment?.url || '');
+                broadcastChannel.findOne({
+                    where: {
+                        userId,
+                        categoryName: category
+                    },
+                }).then(broadcastChannelItem => {
+                    for (const channelId of broadcastChannelItem.listenerIds) {
                         try {
-                            client.channels.fetch(listeningChannelItem.channelId)
-                            .then((channel) => {
-                                require('../utils/resolvename')(interaction.user, interaction.member, false, "ymous")
-                                .then(({displayName}) => {
-                                    channel.send({
-                                        content: `[${category}] ${displayName}: ${message}`,
-                                        allowedMentions: {parse: []}
-                                    })
+                            client.channels.fetch(channelId)
+                            .then(channel => {
+                                if (!channel.permissionsFor(user)?.has(PermissionFlagsBits.SendMessages)) return
+                                channel.send({
+                                    content: `[${category}] <@${userId}>: ${message}`,
+                                    allowedMentions: {parse: []}
                                 })
-                        })
+                            });
                         } catch {
                             console.log("Oops, couldn't fetch/send to channel in broadcast transmission!");
+                            console.log("Consider removing channel automatically");
                         }    
                     }
                 })
+                interaction.reply("Sending your broadcast!");
                 break;
             case 'remove':
-                let categoriesDeleted = interaction.options.getString("category")
-                const whereObj = {
-                    channelId: channelId
-                }
-                if (categoriesDeleted!=="All") {
-                    whereObj.category = category;
-                } else {
-                    categoriesDeleted = broadcastCategories.join(', ')
-                }
-                listeningChannel.destroy({
-                    where: whereObj
-                }).then( (promise) => {
-                    interaction.reply("Successfully removed " + categoriesDeleted + " from that channel.")
+                broadcastChannel.findOne({
+                    where: {
+                        userId,
+                        categoryName: category
+                    },
                 })
+                .then(async selectedChannel => {
+                    const listenerIndex = selectedChannel?.listenerIds.indexOf(channelId);
+                    //If there's no broadcastChannel OR actual channel in the broadcast channel
+                    if (!(listenerIndex + 1)) {
+                        interaction.reply(`Couldn't find the *${category}* category in <#${channelId}>.`);
+                        return;
+                    }
+                    selectedChannel.listenerIds.pop(listenerIndex);
+                    await selectedChannel.save();
+                    interaction.reply(`Successfully removed the *${category}* category in <#${channelId}>.`);
+                });
                 break;
             default:
-                interaction.relpy("Oh snap, something went wrong!")
+                interaction.relpy("Oh snap, something went wrong!");
                 break;
         }
     },

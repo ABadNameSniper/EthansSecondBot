@@ -13,12 +13,6 @@
         "storage": "database.sqlite"
     },
 
-    "permissionHierarchy": {
-        "admins": ["0112358132134"],
-        "broadcasts": {
-            "Updates": [],
-            "art": ["01124713244481", "1248163264128256512"],
-            "music": ["1248163264128256512", "2374318073263443"]
-        }
-    }
+    "admins": ["0112358132134"],
+    "broadcastCategories": [ "updates", "memes", "art", "music"]
 }

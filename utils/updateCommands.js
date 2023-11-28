@@ -1,15 +1,14 @@
 const { REST } = require('@discordjs/rest');
 const fs = require('fs');
+const path = require('path');
 const { Routes } = require('discord-api-types/v9');
-const { type } = require('os');
-const indexRoot = process.cwd()
-const { clientId, token, permissionHierarchy } = require(`${indexRoot}/config.json`);
+const { clientId, token, admins } = require('../config.json');
 const rest = new REST({ version: '9' }).setToken(token);
-const commandsFolderPath = indexRoot+'/commands';
+const commandsFolderPath = path.resolve(__dirname, '../commands');
 const commandFiles = fs.readdirSync(commandsFolderPath).filter(file => file.endsWith('.js'));
 const baseGuildCommands = [];
 const baseApplicationCommands = [];
-const adminPermissions = permissionHierarchy.admins.map((id) => {
+const adminPermissions = admins.map((id) => {
     return {
         id,
         type: 'USER',

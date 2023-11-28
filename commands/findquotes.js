@@ -1,26 +1,8 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, MessageSelectMenu } = require('discord.js');
-
-const indexRoot = process.cwd()
-const { database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-//const { Page, Menu } = require('../utils/menuSystem');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require(indexRoot+'/utils/databaseModels.js');
-const quote = databaseModels.quote(sequelize, Sequelize.DataTypes);
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes);
-const serverInfo = databaseModels.serverInfo(sequelize, Sequelize.DataTypes);
-
-userInfo.hasMany(quote, {foreignKey: "archiverId"});
-userInfo.hasMany(quote, {foreignKey: "sourceUserId"});
-serverInfo.hasMany(quote);
-
-userInfo.sync();
-serverInfo.sync();
-quote.sync();
+const { quote, savedGuild} = require('../models')
 
 module.exports = {
-    guildCommand: true,//true,//temporary
+    guildCommand: true,
 	data: new SlashCommandBuilder()
     .setName('findquotes')
 		.setDescription('Ah, good memories. What funny moments have been stored here?')
@@ -36,15 +18,15 @@ module.exports = {
     async execute(interaction) {
         const client = interaction.client;
         
-        let archiverId = interaction.options.getUser('archiver')?.id;//if this exists, get the userInfo for the archiver
+        let archiverUserId = interaction.options.getUser('archiver')?.id;//if this exists, get the savedUser for the archiver
 
         let source = interaction.options.getString('source');//where source = this
-        let sourceId = source?.match(/\d+/)?.[0];
-        if (sourceId) {
+        let sourceUserId = source?.match(/\d+/)?.[0];
+        if (sourceUserId) {
             //perhaps a try catch. what if the user is deleted?
             try {
-                source = (await interaction.guild.members.fetch(sourceId)?.displayName) 
-                || (await client.users.fetch(sourceId)?.username);
+                source = (await interaction.guild.members.fetch(sourceUserId)?.displayName) 
+                || (await client.users.fetch(sourceUserId)?.username);
             } catch {
                 source = interaction.options.getString('source');
             }
@@ -52,16 +34,22 @@ module.exports = {
 
         const options = {
             where: {
-                serverId: interaction.guildId
+                guildId: interaction.guildId
             },
             include: {
                 model: quote,
-                where: {},
+                where: {}
             },
         }
-        if (archiverId) options.include.where.archiverId = archiverId;
-        if (sourceId) options.include.where.sourceId = sourceId;
-        const entry = await serverInfo.findOne(options)
+        if (archiverUserId) {
+            options.include.where.archiverUserId = archiverUserId;
+        }
+        if (sourceUserId) {
+            options.include.where.sourceUserId = sourceUserId;
+        } else if (source) {
+            options.include.where.sourceAlias = source;
+        }
+        const entry = await savedGuild.findOne(options)
 
         if (!entry?.quotes) {
             interaction.reply("No quotes found!");
@@ -71,8 +59,8 @@ module.exports = {
         let formattedQuotesArray = [];
         for (const quote of entry.quotes) {
             formattedQuotesArray.push(
-                `"${quote.content}" -${quote.shownSource} ${quote.messageId ?
-                `\r Source: https://discord.com/channels/${entry.serverId}/${quote.channelId}/${quote.messageId}`
+                `"${quote.content}" -${quote.sourceAlias} ${quote.sourceMessageId ?
+                `\r Source: https://discord.com/channels/${entry.guildId}/${quote.sourceChannelId}/${quote.sourceMessageId}`
                 : ""}`
             )
         }

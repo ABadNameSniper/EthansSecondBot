@@ -1,13 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const indexRoot = process.cwd()
-const { database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require(indexRoot+'/utils/databaseModels.js')
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes);
-userInfo.sync()
-
-const { Page, Menu } = require(indexRoot+'/utils/menuSystem.js');
+const { Page, Menu } = require('../utils/menuSystem.js');
 const { EmbedBuilder, ComponentType } = require('discord.js');
 const embedDescription1 = 
     "Anonymity level "
@@ -25,10 +17,9 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('settings')
 		.setDescription('opens user settings menu'),
-	async execute(interaction) {
-        let currentUserInfo = await databaseModels.userInfoDefault(userInfo, interaction.user.id);
+	async execute(interaction, currentUser) {
         embed1.setDescription(
-            embedDescription1 + currentUserInfo.get("settings").anonymizeTag
+            embedDescription1 + currentUser.settings.anonymizeTag
         )
         let pages = [
             new Page(
@@ -37,7 +28,7 @@ module.exports = {
                 3
             )
         ];
-        let menu = new Menu (pages, 0);
+        let menu = new Menu (pages, currentUser.settingsPage);
         let message = await menu.send(interaction);
         let collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 30_000 });
         collector.on('collect', i => {
@@ -56,9 +47,7 @@ module.exports = {
                         menu.currentPageNumber = menu.pages.length-1;
                         break;
                     default:
-                        //crud, I may have to readd button types to pages...
-                        userInfo.update({settings: {anonymizeTag: i.customId}}, {where: {userId: i.user.id}});
-                        
+                        currentUser.update({settings: {anonymizeTag: i.customId}});
                 }
                 menu.pages[menu.currentPageNumber].embed.setDescription(embedDescription1 + i.customId);
                 menu.update(i);
@@ -67,7 +56,7 @@ module.exports = {
             }
         });
         collector.on('end', (collected, reason) => {
-            if (reason!=="messageDelete") menu.end(interaction);
+            if (reason !== "messageDelete") menu.end(interaction);
             menu = null;
         });
     }

@@ -1,18 +1,7 @@
 const { InteractionType } = require("discord-api-types/v10");
-
-const indexRoot = process.cwd();
-const { globalAndTestGuildId, database, user, password, options } = require(indexRoot+'/config.json');
-const { Sequelize, Op } = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require('../utils/databaseModels');
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes);
-const blacklistItem = databaseModels.blacklistItem(sequelize, Sequelize.DataTypes);
-const serverInfo = databaseModels.serverInfo(sequelize, Sequelize.DataTypes);
-userInfo.hasMany(blacklistItem, {sourceKey: 'userId'});
-blacklistItem.belongsTo(userInfo, {targetKey: 'userId'});
-serverInfo.hasMany(blacklistItem, {sourceKey: 'serverId'});
-blacklistItem.belongsTo(serverInfo, {targetKey: 'serverId'});
-
+const { globalAndTestGuildId } = require('../config.json');
+const { Op } = require('sequelize');
+const { savedUser, blacklistItem, savedGuild } = require('../models');
 
 module.exports = {
 	name: 'interactionCreate',
@@ -23,13 +12,13 @@ module.exports = {
         const command = client.commands.get(interaction.commandName);
         if (!command) return;
         try {
-            const user = databaseModels.userInfoDefault(userInfo, interaction.user.id);
+            const [currentUser] = await savedUser.findOrCreate({where: {userId: interaction.user.id}});
 
             const blacklistItems = await blacklistItem.findAll({
                 where: {// Filtering out irrelevant servers
                     [Op.or]: [
-                        {serverInfoServerId: interaction.guildId}, 
-                        {serverInfoServerId: globalAndTestGuildId}
+                        {guildId: interaction.guildId}, 
+                        {guildId: globalAndTestGuildId}
                     ],
                 },
                 order: [
@@ -41,7 +30,7 @@ module.exports = {
                 if (item.severity >= (command.severityThreshold || 4)) {
                     interaction.reply({ 
                         content: `You've been blacklisted from Ethan's Second Bot ${
-                            item.serverInfoServerId === globalAndTestGuildId
+                            item.guildId === globalAndTestGuildId
                                 ? "everywhere"
                                 : "in this server"
                             } at severity level ${
@@ -53,7 +42,11 @@ module.exports = {
                 }
             }
 
-            await command.execute(interaction, user);
+            const currentGuild = interaction.channel.isDMBased()
+                ? null
+                : (await savedGuild.findOrCreate({where: {guildId: interaction.channel.guildId}}))[0];
+
+            await command.execute(interaction, currentUser, currentGuild);
         } catch (error) {
             console.log("Something went wrong trying to execute a command!");
             console.log(error);

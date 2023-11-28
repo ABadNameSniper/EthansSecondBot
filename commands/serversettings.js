@@ -1,13 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const indexRoot = process.cwd()
-const { database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require(indexRoot+'/utils/databaseModels.js')
-const serverInfo = databaseModels.serverInfo(sequelize, Sequelize.DataTypes)
-serverInfo.sync()
 
-const { Page, Menu, sliceIntoChunks } = require(indexRoot+'/utils/menuSystem.js');
+const { Page, Menu, sliceIntoChunks } = require('../utils/menuSystem.js');
 
 const { EmbedBuilder, ComponentType, ButtonStyle } = require('discord.js');
 let embed1 = new EmbedBuilder()
@@ -20,19 +13,17 @@ module.exports = {
 		.setName('serversettings')
 		.setDescription('opens server serverSettings menu')
         .setDefaultMemberPermissions('0'),
-	async execute(interaction) {
-        currentServerInfo = await databaseModels.serverInfoDefault(serverInfo, interaction.guild.id);
-        if (!currentServerInfo) throw new Error("Somehow a server wasn't found");
-        let currentServerSettings = currentServerInfo.get("serverSettings");
+	async execute(interaction, _currentUser, currentGuild) {
+        let serverSettingsPage = currentGuild.serverSettingsPage;
         //TODO: change to 20 when exceeds 25
-        let currentServerSettingsKeyArray = sliceIntoChunks(Object.keys(currentServerSettings), 25);
+        let currentServerSettingsKeyArray = sliceIntoChunks(Object.keys(currentGuild.serverSettings), 25);
         let pages = [];
         let buttonTypeArray = []
-        for (const buttonType of currentServerSettingsKeyArray[0]) {
+        for (const setting of currentServerSettingsKeyArray[0]) {
             buttonTypeArray.push(
-                buttonType
-                ? ButtonStyle.Success 
-                : ButtonStyle.Danger
+                currentGuild.serverSettings[setting]
+                    ? ButtonStyle.Success 
+                    : ButtonStyle.Danger
             );
         }
 
@@ -42,10 +33,10 @@ module.exports = {
             3,
             buttonTypeArray
         ));
-        let menu = new Menu (pages, 0);//change from 0 to serverSettingsPage later
+        let menu = new Menu (pages, serverSettingsPage);
         const message = await menu.send(interaction);
         const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000 });
-        collector.on('collect', i => {
+        collector.on('collect', async i => {
             if (i.user.id === interaction.user.id) {                
                 switch(i.customId) {
                     case "first":
@@ -61,17 +52,19 @@ module.exports = {
                         menu.currentPageNumber = menu.pages.length-1;
                         break;
                     default:
-                        currentServerSettings[i.customId] = !currentServerSettings[i.customId];
-                        serverInfo.update({serverSettings: currentServerSettings}, {where:{serverId: interaction.guild.id}})
+                        const updatedSettings = {...currentGuild.serverSettings};
+                        updatedSettings[i.customId] = !updatedSettings[i.customId]
+                        await currentGuild.update({serverSettings: updatedSettings});
 
-                        for (let msgActionRow of menu.pages[menu.currentPageNumber].rows) {
-                            for (let component of msgActionRow.components) {
+                        for (const msgActionRow of menu.pages[menu.currentPageNumber].rows) {
+                            for (const component of msgActionRow.components) {
                                 if (component.data.custom_id === i.customId) {
                                     component.setStyle(
                                         component.data.style === ButtonStyle.Success 
                                         ? ButtonStyle.Danger 
                                         : ButtonStyle.Success
                                     );//flip the style
+                                    break;
                                 }
                             }
                         }
@@ -82,7 +75,7 @@ module.exports = {
             }
         });
         collector.on('end', (collected, reason) => {
-            if (reason!=="messageDelete") menu.end(interaction);
+            if (reason !== "messageDelete") menu.end(interaction);
             menu = null;
         });
     }

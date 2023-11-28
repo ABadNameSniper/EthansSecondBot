@@ -1,14 +1,9 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const fs = require('fs');
-const indexRoot = process.cwd();
-const { database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const {Page, Menu, sliceIntoChunks } = require(indexRoot+'/utils/menuSystem.js');//selection type could be obsolete, consider removing (from source!)
+const path = require('path');
+const {Page, Menu, sliceIntoChunks } = require('../utils/menuSystem.js');//selection type could be obsolete, consider removing (from source!)
 const { EmbedBuilder, ComponentType } = require('discord.js');
-const databaseModels = require(indexRoot+'/utils/databaseModels');
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes);
-userInfo.sync();
+const { savedUser } = require('../models');
 
 let embed = new EmbedBuilder()
     .setColor('#771177')
@@ -20,12 +15,11 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('introlist')
 		.setDescription('opens intro menu'),
-	async execute(interaction) {
-        currentUserInfo = await databaseModels.userInfoDefault(userInfo, interaction.user.id);
-        var introSelected = currentUserInfo.get("introSelected");
+	async execute(interaction, currentUser) {
+        const introSelected = currentUser.introSelected;
 
         //Move outside the function in case performance is an issue.
-        const introFileNames = fs.readdirSync(indexRoot+'/assets/audio/intros');
+        const introFileNames = fs.readdirSync(path.resolve(__dirname, '../assets/audio/intros'));
         //Once it gets more than 25 i will have to manually set to 20 so buttons can fit
         const returnedArray = sliceIntoChunks(introFileNames, 25)
         returnedArray[0].unshift("none");//can't forget an opt-out option!
@@ -35,7 +29,7 @@ module.exports = {
         }
 
         let menu = new Menu (pages, 0);//could have dynamic starter page!!
-        menu.pages[menu.currentPageNumber].embed.setDescription("Select an introduction! \n Current introduction: "+introSelected)
+        menu.pages[menu.currentPageNumber].embed.setDescription("Select an introduction! \n Current introduction: " + introSelected);
         const message = await menu.send(interaction);
         const collector = message.createMessageComponentCollector({ componentType: ComponentType.Button, time: 60_000 });
         collector.on('collect', i => {
@@ -54,7 +48,7 @@ module.exports = {
                         menu.currentPageNumber = menu.pages.length-1;
                         break;
                     default:
-                        userInfo.update({introSelected: i.customId}, {where: {userId: interaction.user.id}});
+                        savedUser.update({introSelected: i.customId}, {where: {userId: interaction.user.id}});
                 }
                 menu.pages[menu.currentPageNumber].embed.setDescription("Select an introduction! \n Current introduction: "+i.customId);
                 menu.update(i);

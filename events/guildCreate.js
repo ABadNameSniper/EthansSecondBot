@@ -1,15 +1,7 @@
-//const fs = require('fs');
 const { PermissionFlagsBits } = require('discord.js');
-const indexRoot = process.cwd();
-//const updateCommandsExports = require(`${indexRoot}/updateCommandsExports.js`);
-const { database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require(indexRoot+'/utils/databaseModels.js');
-const listeningChannel = databaseModels.listeningChannel(sequelize, Sequelize.DataTypes)
-listeningChannel.sync();
-
-const updateCommands = require(`${indexRoot}/utils/updateCommands.js`);
+const updateCommands = require(`../utils/updateCommands.js`);
+const headAdminId = require('../config.json').admins[0];
+const primeCategory = require('../config.json').broadcastCategories[0];
 module.exports = {
 	name: 'guildCreate',
 	async execute(guildId, client) {
@@ -26,16 +18,17 @@ module.exports = {
             guild.systemChannelId 
             && guild.systemChannel.permissionsFor(client.user.id)?.has(PermissionFlagsBits.SendMessages)
         ) {
-            require(indexRoot+'/commands/broadcasts.js').addNewChannel(listeningChannel, guild.systemChannelId, "Updates");
-            guild.systemChannel.send(welcomeString+
-                "\rUpdates come very frequently, so I've added a broadcast listener to this channel that will let you know of new content!"
+            require('../commands/broadcasts.js').addNewChannel(headAdminId, primeCategory, guild.systemChannelId);
+            //TODO: add server setting that disables this...
+            guild.systemChannel.send(
+                welcomeString +
+                "\rUpdates come frequently, so I've added a broadcast listener to this channel that will let you know of new content!"
             );
         } else {
             guild.fetchOwner().then(owner => {
                 owner.send(
                     "Either there was no system channel, or I don't have permission to speak in it. "
                     + welcomeString
-                    + " You can see update logs as they come by using /broadcast add in your server."
                 );
             })
         }

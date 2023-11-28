@@ -1,17 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const indexRoot = process.cwd()
-const { globalAndTestGuildId, clientId, database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require(indexRoot+'/utils/databaseModels.js')
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes)
-const serverInfo = databaseModels.serverInfo(sequelize, Sequelize.DataTypes)
-const blacklistItem = databaseModels.blacklistItem(sequelize, Sequelize.DataTypes);
-userInfo.hasMany(blacklistItem, {sourceKey: 'userId'});
-blacklistItem.belongsTo(userInfo, {targetKey: 'userId'});
-userInfo.sync();
-serverInfo.sync();
-blacklistItem.sync();
+const { globalAndTestGuildId, clientId } = require('../config.json');
+const { blacklistItem } = require('../models');
 const resolveName = require('./../utils/resolvename');
 const { EmbedBuilder, MessageType, ActivityType } = require('discord.js');
 
@@ -87,11 +76,9 @@ const updateMessage = async function(oldmsg, newmsg) {
 	if (oldmsg?.author?.bot) return
 
 	const oldTextChannel = textChannels[oldmsg.channelId];
-
 	if (!oldTextChannel) return;
 
 	const messageReceipt = oldTextChannel.hyperMessageCache[oldmsg.id];
-
 	if (!messageReceipt) return;
 
 	const hyperChannel = oldTextChannel.hyperChannel
@@ -195,13 +182,13 @@ module.exports = {
 				.setMinValue(1)
 				.setMaxValue(7)//it must be below 15 to avoid webhook error when replying pls fix better in the future.
 		),
-	async execute(interaction) {
+	async execute(interaction, currentUser, currentGuild) {
 		//check blacklist status. If command is coming from DMs, check global bans.
 		const channel = interaction.channel;
 		const isDM = channel.isDMBased();
 		const blSeverity = (
 			await blacklistItem.findOne({
-				where: {serverInfoServerId: isDM 
+				where: {guildId: isDM 
 					? globalAndTestGuildId 
 					: interaction.guildId
 				}
@@ -211,11 +198,9 @@ module.exports = {
 		
 		const client = interaction.client;
 		const textChannelId = channel.id;
-		const guildId = interaction.guildId
 		let textChannel = textChannels[textChannelId];
 		let hyperChannelId = interaction.options.getInteger('hyperchannelid');
-		if (!isDM) currentServerInfo = await databaseModels.serverInfoDefault(serverInfo, guildId);
-		if (!isDM && (!currentServerInfo || !currentServerInfo.get("serverSettings").allowhyperchats)) {
+		if (!isDM && !currentGuild.serverSettings.allowhyperchats) {
 			interaction.reply("Hyperchats not enabled in this server! Toggle them on with /serversettings");
 			return;
 		} 
@@ -309,11 +294,11 @@ module.exports = {
 		textChannel.collector.on('collect', async msg =>  {
 			//benchmarking
 			let t0 = performance.now();
-
-			const { displayName, embedColor, avatarURL } = await fullyResolveName(isDM && msg.author, msg.member);
+			
+			const { displayName, embedColor, avatarURL } = await fullyResolveName(msg.author, msg.member);
 
 			senderString = `${displayName} | ${channelName}`
-			if (!isDM && !currentServerInfo.get("serverSettings").anonymizeName) senderString += ` | ${interaction.guild.name}`;
+			if (!isDM && !currentGuild.serverSettings.anonymizeName) senderString += ` | ${interaction.guild.name}`;
 			
 			textChannel.hyperMessageCache[msg.id] = []
 			const hyperMessage = textChannel.hyperMessageCache[msg.id];

@@ -1,29 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { ActionRowBuilder, ButtonBuilder,  ButtonStyle, ComponentType } = require('discord.js');
-const indexRoot = process.cwd()
-const { globalAndTestGuildId, database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require(indexRoot+'/utils/databaseModels.js');
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes);
-const serverInfo = databaseModels.serverInfo(sequelize, Sequelize.DataTypes);
-const minesweeperGame = databaseModels.minesweeperGame(sequelize, Sequelize.DataTypes);
-
-userInfo.hasMany(minesweeperGame, {sourceKey: 'userId'});
-serverInfo.hasMany(minesweeperGame, {sourceKey: 'serverId'});
-
-userInfo.sync();
-serverInfo.sync();
-
-
-minesweeperGame.belongsTo(userInfo, {
-    targetKey: 'userId'
-});
-minesweeperGame.belongsTo(serverInfo, {
-    targetKey: 'serverId'
-})
-minesweeperGame.sync();
-
+const { globalAndTestGuildId } = require('../config.json');
+const { minesweeperGame } = require('../models');
 var playerData = {};
 
 const explosion = "💥";
@@ -261,7 +239,7 @@ module.exports = {
             //maybe change this up when  I add text input
             interaction.reply(
                 "Sorry, Discord isn't meant for minesweeper, so with this control layout I can only add 24 buttons" +
-                " + the flag! Try making a smaller grid or setting the `buttons` option to off."
+                " + the flag! Try making a smaller grid or setting the `buttons` option to off if you're on mobile."
             );
             return;
         } 
@@ -346,7 +324,7 @@ module.exports = {
                     `Better luck next time!`
                     + `\nDifficulty: ${difficulty} | `
                     + `Spaces Dug: ${squaresDug} | ` 
-                    + `Time: ${(Date.now()-initialClickTime)/1000} | `
+                    + `Time: ${((Date.now()-initialClickTime)/1000).toFixed(3)} | `
                     + `Correct Flags: ${correctFlags} | `
                     + `Incorrect Flags: ${incorrectFlags}`
                 );
@@ -374,7 +352,7 @@ module.exports = {
             return `\nDifficulty: ${difficulty} |` 
                 + `Total Mines: ${mines} | `
                 + `Mines Left: ${mines-flagsAmount} | `
-                + `Time: ${(Date.now() - initialClickTime)/1000}s`
+                + `Time: ${((Date.now()-initialClickTime)/1000).toFixed(3)}s`
         }
         
         let initialClickTime;
@@ -436,11 +414,11 @@ module.exports = {
             if (squaresDug === height * width - mines) {
                 //win
                 const msTime = Date.now() - initialClickTime;
-                endGame(`\nDifficulty: ${difficulty} | ${mines} mines complete in ${msTime/1000} seconds!`);
+                endGame(`\nDifficulty: ${difficulty} | ${mines} mines complete in ${(msTime/1000).toFixed(3)} seconds!`);
                 if (difficulty === "Custom") return;
                 minesweeperGame.create({
-                    userInfoUserId: userId,
-                    serverInfoServerId: interaction?.guild?.id || globalAndTestGuildId,
+                    userId,
+                    guildId: interaction?.guild?.id || globalAndTestGuildId,
                     difficulty: difficulty,
                     time: msTime,
                 });
@@ -467,7 +445,7 @@ module.exports = {
             filter: m => 
                 m.author.id === userId
                 && m.content.length
-                && m.content.length <= 3 , 
+                && m.content.length <= 4 , 
             time: timeLimit
         });
         
@@ -475,10 +453,10 @@ module.exports = {
             //this is written assuming a height of 26 for 26 letters.
             const content = msg.content.toUpperCase();
             const numbers = content.match(/\d{1,2}/g);
-            if (!numbers.length || numbers.length > 1) return;
+            if (!numbers?.length || numbers.length > 1) return;
             player.x = parseInt(numbers[0]);
             const letters = content.match(/[A-Z]/g);
-            if (!letters.length || letters.length > 2) return;
+            if (!letters?.length || letters.length > 2) return;
             if (letters.length > 1) {
                 player.flagging = true;
                 if (letters[0] === "F") {
@@ -495,7 +473,7 @@ module.exports = {
             } else {
                 player.y = letters[0].charCodeAt(0) - 65;
             }
-            if (x >= width || y >= height) return;
+            if (player.x >= width || player.y >= height) return;
             if (msg.deletable) msg.delete();
             inputFunction();
         });
@@ -505,7 +483,7 @@ module.exports = {
             `\nGame ended due to ${reason}.`
             + `\nDifficulty: ${difficulty} | `
             + `Spaces Dug: ${squaresDug ?? 0} | ` 
-            + `Time: ${(Date.now()-initialClickTime)/1000} | `
+            + `Time: ${((Date.now()-initialClickTime)/1000).toFixed(3)} | `
             + `Correct Flags: ${correctFlags ?? 0} | `
             + `Incorrect Flags: ${incorrectFlags ?? 0}`
             );

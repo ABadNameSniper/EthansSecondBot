@@ -1,4 +1,4 @@
-const { token } = require('./config.json');
+const { token } = require('../config.json');
 const { Client, GatewayIntentBits } = require('discord.js');
 const client = new Client({ 
     intents: [
@@ -8,7 +8,7 @@ const client = new Client({
 });
 client.login(token);
 
-const updateCommands = require("./utils/updateCommands");
+const updateCommands = require("./updateCommands");
 
 module.exports = {
     updateGuildCommands: function() {

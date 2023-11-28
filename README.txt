@@ -33,9 +33,6 @@ Is checking permissions for trigger words necessary? It might be easier just to 
 
 change anonymity level setting to: username, display, and anonymous
 
-combine serverInfoDefault/userInfoDefault into something much, much better. Eliminate all rogue FindOnes
-+ provide the user row to each command (with verification/permissions) in the command handler, as a second argument
-
 maybe lint the source code?
 
 make menu system more encompassing instead of having the same menu code pasted on 4 different command

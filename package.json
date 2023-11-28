@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "update-guildcommands": "run-func ./updateCommandsScript.js updateGuildCommands",
-    "update-appcommands": "run-func ./updateCommandsScript.js updateAppCommands",
+    "update-guildcommands": "run-func ./utils/updateCommandsScript.js updateGuildCommands",
+    "update-appcommands": "run-func ./utils/updateCommandsScript.js updateAppCommands",
+    "syncDB": "run-func ./utils/syncDB.js updateAllDB",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "contributors": [
@@ -15,14 +16,15 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@discordjs/opus": "^0.9.0",
     "@discordjs/rest": "^2.0.0",
-    "@discordjs/voice": "^0.16.0",
+    "@discordjs/voice": "^0.16.1",
     "discord-api-types": "^0.37.60",
     "discord-tts": "^1.0.3",
     "discord.js": "^14.12.1",
-    "libsodium-wrappers": "^0.7.13",
     "run-func": "^3.0.0",
     "sequelize": "^6.33.0",
+    "sodium-native": "^4.0.4",
     "sqlite3": "^5.1.6"
   }
 }

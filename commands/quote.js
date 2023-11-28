@@ -1,22 +1,8 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
-const indexRoot = process.cwd();
-const { database, user, password, options } = require(indexRoot+'/config.json');
-const Sequelize = require('sequelize');
-const sequelize = new Sequelize(database, user, password, options);
-const databaseModels = require(indexRoot+'/utils/databaseModels.js');
+const { quote } = require('../models');
+const savedUser = require('../models/savedUser.model');
 
-const userInfo = databaseModels.userInfo(sequelize, Sequelize.DataTypes);
-const serverInfo = databaseModels.serverInfo(sequelize, Sequelize.DataTypes);
-const quote = databaseModels.quote(sequelize, Sequelize.DataTypes);
-
-userInfo.hasMany(quote, {foreignKey: "archiverId"});
-userInfo.hasMany(quote, {foreignKey: "sourceUserId"});
-serverInfo.hasMany(quote);
-
-userInfo.sync();
-serverInfo.sync();
-quote.sync();
 
 module.exports = {
     guildCommand: true,
@@ -34,55 +20,64 @@ module.exports = {
     )
     ,
     async execute(interaction) {
-        const archiverId = interaction.user.id;
-        const sourceServerId = interaction.guildId;
-
+        const archiverUserId = interaction.user.id;
+        const archiverGuildId = interaction.guildId;
+        
         let content = interaction.options.getString('content');
         let source = interaction.options.getString('source') || "Anonymous";
         
-        const [serverId, channelId, messageId] = content.match(/https:\/\/discord\.com\/channels\/\d+\/\d+\/\d+/)?.[0].match(/\d+/g);
-        let sourceId, sourceName;
-        if (serverId === sourceServerId && channelId && messageId) {
-            const channel = await interaction.guild.channels.fetch(channelId);
-            const message = await channel.messages.fetch(messageId);
+        const [sourceGuildId, sourceChannelId, sourceMessageId] = 
+            content.match(/https:\/\/discord\.com\/channels\/\d+\/\d+\/\d+/)?.[0].match(/\d+/g)
+            || [];
+        let sourceUserId, sourceAlias;
+        if (sourceGuildId === interaction.guildId && sourceChannelId && sourceMessageId) {
+            const channel = await interaction.guild.channels.fetch(sourceChannelId);
+            const message = await channel.messages.fetch(sourceMessageId);
 
             source = message.author
-            sourceName = message.member.displayName;
+            sourceAlias = message.member.displayName;
 
-            sourceId = source.id;
+            sourceUserId = source.id;
             content = message.content;
+
+            await savedUser.findOrCreate({where: {userId: sourceUserId}});
         } else {
-            sourceId = source?.match(/\d+/)?.[0];
-            if (sourceId) {
-                source = await interaction.guild.members.fetch(sourceId);
-                sourceName = source.displayName;
+            //match <@userid>
+            sourceUserId = source?.match(/\d+/)?.[0];
+            if (sourceUserId) {
+                source = await interaction.guild.members.fetch(sourceUserId);
+                sourceAlias = source.displayName;
+                //Make sure the source user is in the database to avoid Foreign Key constraint failure.
+                await savedUser.findOrCreate({where: {userId: sourceUserId}});
             }
         }
 
-
-        if (sourceId === archiverId) {
+        if (sourceUserId === archiverUserId) {
             interaction.reply("Self-quote? Kinda cringe :flushed:"); 
             return;
         } 
         if (source?.bot) {
-            interaction.reply({content:"You can't quote a bot!", ephemeral:true});
+            interaction.reply({content: "You can't quote a bot!", ephemeral: true});
             return;
         } 
         //If not previously set, use whatever the user provided.
-        if (!sourceName) sourceName = source
+        if (!sourceAlias) sourceAlias = source
 
-        databaseModels.userInfoDefault(userInfo, archiverId).then(()=>{
-            quote.create({
-                channelId: channelId,
-                messageId: messageId,
-                serverInfoServerId: sourceServerId,
-                content: content,
-                shownSource: sourceName,
-                sourceUserId: sourceId,
-                archiverId: archiverId
-            }).then(
-                interaction.reply({content:"Quote Saved!", ephemeral: true})
-            );
-        });
+        try {
+            await quote.create({
+                archiverUserId,
+                archiverGuildId,
+                content,
+                sourceAlias,
+                sourceGuildId,
+                sourceChannelId,
+                sourceMessageId,
+                sourceUserId,
+            });
+            interaction.reply({content: 'Quote created successfully!', ephemeral: true});
+        } catch (error) {
+            interaction({content: 'Error creating quote!', ephemeral: true});
+            console.log("Error creating quote:", error);
+        }
     }
 }
