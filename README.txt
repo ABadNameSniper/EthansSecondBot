@@ -6,16 +6,9 @@ Thank you so much Dragonhelm for the profile picture!
 
 ## TODO
 
-### Broadcasts
-broadcasting system should be it's own DB table or something
-support private broadcast channels
-better error handling for broadcasts transmissions to unallowed channels (dm server owner?)
-remove permissionHierarchy.broadcasts, put that all into the database. Dynamic categories or something
-
 ### Hyperchats
 Hyperchats in threads update: maybe make it an optional argument, and the default can be set with serverSettings
 fix weird double embedding bug with hyperchats?
-replying to hyperchats should reply to the original message -- MAYBE
 some variety of flavor text when joining and leaving hyperchannels could be fun
 decide on "hyperchats" or "hyperchannels" maybe. It's a weird mix of both right now.
 

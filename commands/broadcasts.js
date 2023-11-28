@@ -14,16 +14,11 @@ const addNewChannel = async function(userId, categoryName, channelId) {
             categoryName,
         }
     })
-    console.log(newChannel);
-    console.log(newChannel.listenerIds);
-    if (newChannel.listenerIds.includes(channelId)) {
-        return true;
-    } else {
-        newChannel.listenerIds = [...newChannel.listenerIds, channelId];
-        await newChannel.save();
-    }
-    console.log(newChannel);
-    console.log(newChannel.listenerIds);
+    if (newChannel.listenerIds.includes(channelId)) return true;
+    
+    newChannel.listenerIds = [...newChannel.listenerIds, channelId];
+    await newChannel.save();
+    return false;
 }
 
 const makeCategoriesOption = function(option) {
@@ -102,12 +97,13 @@ module.exports = {
                     interaction.reply("Assignment failed! You don't have permission to send messages in that channel.");
                     return;
                 }
-
-                if (addNewChannel(userId, category, channelId)){
-                    interaction.reply(`Adding *${category}* reciever to <#${channelId}>.`);
-                } else {
-                    interaction.reply("The selected channel is already listening to that category!");
-                }
+                addNewChannel(userId, category, channelId).then(alreadyPresent => {
+                    if (alreadyPresent){
+                        interaction.reply("The selected channel is already listening to that category!");
+                    } else {
+                        interaction.reply(`Adding *${category}* reciever to <#${channelId}>.`);
+                    }
+                })
                 break;
             case 'transmit':
                 if (!broadcastCategories.includes(category)) {
@@ -159,7 +155,9 @@ module.exports = {
                         interaction.reply(`Couldn't find the *${category}* category in <#${channelId}>.`);
                         return;
                     }
-                    selectedChannel.listenerIds.pop(listenerIndex);
+                    const updatedList = [...selectedChannel.listenerIds];
+                    updatedList.pop(listenerIndex);
+                    selectedChannel.listenerIds = updatedList;
                     await selectedChannel.save();
                     interaction.reply(`Successfully removed the *${category}* category in <#${channelId}>.`);
                 });
